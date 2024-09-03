@@ -10,11 +10,11 @@ web game by websocket
 3. 랜덤 미로
 
 ### 환경
-####서버
+서버
 - 배포 : 로컬서버 or AWS
 - OS : 우분투 20.04+
 - 언어 : python
 - 도구 : uvicorn + fastapi
 - DB : MySQL
-####클라이언트
+클라이언트
 - 브라우저
