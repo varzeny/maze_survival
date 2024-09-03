@@ -16,5 +16,6 @@ web game by websocket
 - 언어 : python
 - 도구 : uvicorn + fastapi
 - DB : MySQL
+
 클라이언트
 - 브라우저
