@@ -1,0 +1,34 @@
+/* common/thema.css */
+
+html {
+    font-size: x-large;
+}
+
+body {
+    width: 100%; height: 100%;
+    background-color: black;
+    color: darkgray;
+
+}
+
+h1 {
+    font-size: 1.6rem;
+}
+h2 {
+    font-size: 1.5rem;
+    color: deeppink;
+}
+h3 {
+    font-size: 1.4rem;
+    color: orangered;
+}
+h4 {
+    font-size: 1.3rem;
+    color: orange;
+}
+h5 {
+    font-size: 1.2rem;
+}
+h6 {
+    font-size: 1.1rem;
+}

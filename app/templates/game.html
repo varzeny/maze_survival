@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <title>game</title>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <link rel='stylesheet' type='text/css' href="{{ url_for('static_files', path='css/reset.css') }}">
+    <link rel='stylesheet' type='text/css' href="{{ url_for('static_files', path='css/thema.css') }}">
+    <link rel='stylesheet' type='text/css' href="{{ url_for('static_files', path='css/game.css') }}">
+    <script src="{{ url_for('static_files', path='js/game.js') }}"></script>
+</head>
+<body>
+    <aside>
+
+    </aside>
+    <main>
+        <section class="screen">
+            <canvas class="can" id="can-1"></canvas>
+        </section>
+
+        <section class="control">
+            <div class="state">
+                HP : <span id="hp">0</span><br>
+                MP : <span id="mp">0</span>
+            </div>
+            <div class="consol">
+                consol
+            </div>
+            <div class="etc">
+                etc
+            </div>
+        </section>
+    </main>
+</body>
+</html>
