@@ -6,8 +6,10 @@ from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
 from fastapi.responses import Response, FileResponse
 from fastapi.websockets import WebSocket
+import struct
 
 # module
+
 
 # attribute
 router = APIRouter()
@@ -27,11 +29,11 @@ async def websocket_endpoint(ws: WebSocket):
     try:
         while True:
             # 클라이언트로부터 메시지를 받음
-            data = await ws.receive_text()
-            print(f"Received message: {data}")
+            data = await ws.receive_bytes()
+            print(f"Received message: {struct.unpack('B',data)[0]}")
             
             # 클라이언트로 메시지를 다시 보냄
-            await ws.send_text(f"Message received: {data}")
+            # await ws.send_text(f"Message received: {data}")
     except Exception as e:
         print(f"WebSocket connection error: {e}")
 
