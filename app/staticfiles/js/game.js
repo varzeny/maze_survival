@@ -3,8 +3,17 @@ document.addEventListener("DOMContentLoaded", init);
 
 let WS;
 let keysPressed = 0;  // 비트 플래그로 눌린 키들을 저장 (1바이트로 관리)
-let listen;
-// let LAST = 0;
+
+const CONTEXT = {}
+const USER = {
+    id:null,
+    name:null,
+    ws:null,
+    row:null,
+    col:null
+}
+let MAZE = null;
+let MAP = null;
 
 // 각 키에 대한 비트 매핑 (파이썬 코드 순서와 맞춤)
 const keyMap = {
@@ -19,51 +28,59 @@ const keyMap = {
 };
 
 async function init() {
-    // WebSocket 연결 정의
-    WS = new WebSocket("wss://test.varzeny.com/ws-game");
+    //context 불러오기
+    CONTEXT.name = document.getElementById("context").getAttribute("data-name");
 
-    // WebSocket 이벤트 설정
-    WS.addEventListener("open", function(ev) {
-        console.log("WS is connected !");
-        listen = setInterval(sendState, 200);
-
-    });
-
-    WS.addEventListener("close", function(ev) {
-        console.log("WS is disconnected !");
-        clearInterval(listen);
-    });
-
-    WS.addEventListener("message", function(ev) {
-        const blob = ev.data;  // 서버에서 보낸 메시지 (Blob 형식)
-
-        if (blob instanceof Blob) {
-            // Blob을 ArrayBuffer로 변환
-            const reader = new FileReader();
-            reader.onload = function() {
-                const arrayBuffer = reader.result;  // ArrayBuffer로 변환된 데이터
-                const view = new DataView(arrayBuffer);
-                
-                // 2바이트씩 읽어들이기 (각 값은 16비트)
-                const row = view.getUint16(0, true);  // 첫 번째 short (row)
-                const col = view.getUint16(2, true);  // 두 번째 short (col)
-                const status1 = view.getUint16(4, true);  // 세 번째 short (status1)
-                const status2 = view.getUint16(6, true);  // 네 번째 short (status2)
+    // 필수 오브젝트들 구성
+    USER.name = CONTEXT.name
+    USER.ws = new WebSocket("wss://test.varzeny.com/ws-game");
+    USER.ws.binaryType = "arraybuffer";
     
-                // 출력해서 확인
-                console.log("Received data - Row:", row, "Col:", col, "Status1:", status1, "Status2:", status2);
-            };
-            
-            // Blob을 ArrayBuffer로 변환하는 작업 시작
-            reader.readAsArrayBuffer(blob);
-        } else {
-            console.log("Received non-binary message:", ev.data);
+    // WebSocket 이벤트 설정
+    USER.ws.addEventListener("open", function(ev) {
+        console.log("WS is connected !");
+
+    });
+
+    USER.ws.addEventListener("close", function(ev) {
+        console.log("WS is disconnected !");
+        window.location.href = "/";
+    });
+
+    USER.ws.addEventListener("message", function(ev) {
+        const resp = ev.data;
+        const respData = new DataView(resp);
+        const respType = respData.getUint8(0, true)
+
+        switch(respType){
+            case 1: // 유저상태 수신
+                USER.id = respData.getUint8(1, true);
+                USER.name = CONTEXT.name;
+                USER.row = respData.getUint16(2, true);
+                USER.col = respData.getUint16(4, true);
+                console.log(USER);
+                break;
+            case 2:
+                const matrix = new Uint8Array( resp, 1 );
+                const rows = 10;
+                const cols = 10;
+                const maze = [];
+                for (let i = 0; i < rows; i++) {
+                    maze.push(matrix.slice(i * cols, (i + 1) * cols));
+                }
+                MAZE = maze;
+                showMaze(MAZE,10,10);
+                console.log(USER);
+                break;
+            case 3:
+                break;
+            default:
+                console.log("알 수 없는 타입");
         }
     });
 
-    WS.addEventListener("error", function(ev) {
+    USER.ws.addEventListener("error", function(ev) {
         console.error("WS error : ", ev);
-        clearInterval(listen);
     });
 
     // 키 이벤트 리스너 설정
@@ -71,6 +88,7 @@ async function init() {
     document.addEventListener("keyup", keyUp);
 
     console.log("home.js 로드 완료");
+
 }
 
 function sendState() {
@@ -108,4 +126,30 @@ function keyUp(ev) {
 
         // sendState();
     }
+}
+
+
+
+function showMaze(maze, rows, cols) {
+    let mazeStr = "+" + "---+".repeat(cols) + "\n";  // 상단 벽
+
+    for (let r = 0; r < rows; r++) {
+        // 각 행의 세로 벽
+        mazeStr += "|";
+        for (let c = 0; c < cols; c++) {
+            // 셀 내부 공백 및 오른쪽 벽 확인 (비트 2 확인)
+            mazeStr += (maze[r][c] & 2) ? "   |" : "    ";
+        }
+        mazeStr += "\n";
+
+        // 각 행의 가로 벽
+        mazeStr += "+";
+        for (let c = 0; c < cols; c++) {
+            // 아래쪽 벽 확인 (비트 4 확인)
+            mazeStr += (maze[r][c] & 4) ? "---+" : "   +";
+        }
+        mazeStr += "\n";
+    }
+
+    console.log(mazeStr);
 }
