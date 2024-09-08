@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", init);
 
 let WS;
 let keysPressed = 0;  // 비트 플래그로 눌린 키들을 저장 (1바이트로 관리)
+let listen;
 // let LAST = 0;
 
 // 각 키에 대한 비트 매핑 (파이썬 코드 순서와 맞춤)
@@ -24,21 +25,45 @@ async function init() {
     // WebSocket 이벤트 설정
     WS.addEventListener("open", function(ev) {
         console.log("WS is connected !");
-        // WS.send(111);
+        listen = setInterval(sendState, 200);
 
-        setInterval(sendState, 200);
     });
 
     WS.addEventListener("close", function(ev) {
         console.log("WS is disconnected !");
+        clearInterval(listen);
     });
 
     WS.addEventListener("message", function(ev) {
-        console.log("server's msg : ", ev.data);
+        const blob = ev.data;  // 서버에서 보낸 메시지 (Blob 형식)
+
+        if (blob instanceof Blob) {
+            // Blob을 ArrayBuffer로 변환
+            const reader = new FileReader();
+            reader.onload = function() {
+                const arrayBuffer = reader.result;  // ArrayBuffer로 변환된 데이터
+                const view = new DataView(arrayBuffer);
+                
+                // 2바이트씩 읽어들이기 (각 값은 16비트)
+                const row = view.getUint16(0, true);  // 첫 번째 short (row)
+                const col = view.getUint16(2, true);  // 두 번째 short (col)
+                const status1 = view.getUint16(4, true);  // 세 번째 short (status1)
+                const status2 = view.getUint16(6, true);  // 네 번째 short (status2)
+    
+                // 출력해서 확인
+                console.log("Received data - Row:", row, "Col:", col, "Status1:", status1, "Status2:", status2);
+            };
+            
+            // Blob을 ArrayBuffer로 변환하는 작업 시작
+            reader.readAsArrayBuffer(blob);
+        } else {
+            console.log("Received non-binary message:", ev.data);
+        }
     });
 
     WS.addEventListener("error", function(ev) {
         console.error("WS error : ", ev);
+        clearInterval(listen);
     });
 
     // 키 이벤트 리스너 설정

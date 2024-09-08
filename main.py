@@ -10,11 +10,14 @@ load_dotenv()
 # module
 from app.l1.foreground.routers.common import router as common_router
 from app.l1.foreground.routers.content import router as content_router
-# from app.l1.background.content
+import app.l1.background.game_manager as GM
 
 # method
 async def statup():
     print()
+
+    # content
+    # GM.activate()
 
 
 

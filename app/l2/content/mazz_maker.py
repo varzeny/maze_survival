@@ -1,6 +1,8 @@
 # content/maze_maker.py
 
 # lib
+import sys
+# sys.setrecursionlimit(10000)
 import numpy as np
 import random
 
@@ -26,19 +28,26 @@ class MazeManager:
 
         # 길만들기
         self.re_pathfinder(r, c)
+        # self.show_maze()
 
 
-    def re_pathfinder(self, r, c):
+    def re_pathfinder(self, start_r, start_c):
         # print( f"행:{r}, 열:{c} = 값:{self.maze[r,c]}" )
-        seq = self.direction[:]
-        random.shuffle( seq )
-        for dr, dc, cv, nv in seq:
-            nr, nc = r+dr, c+dc
-            if (0<=nr<self.row) and (0<=nc<self.col):
-                if self.maze[nr,nc] & 15 == 15:
-                    self.maze[r,c] -= cv
-                    self.maze[nr, nc] -= nv
-                    self.re_pathfinder(nr, nc)
+        stack = [(start_r, start_c)]  # 스택에 시작 좌표 추가
+
+        while stack:
+            r, c = stack.pop()  # 스택에서 좌표를 꺼냄
+
+            seq = self.direction[:]  # 가능한 방향을 섞기
+            random.shuffle(seq)
+
+            for dr, dc, cv, nv in seq:
+                nr, nc = r + dr, c + dc
+                if 0 <= nr < self.row and 0 <= nc < self.col:
+                    if self.maze[nr, nc] & 15 == 15:  # 아직 방문하지 않은 경우
+                        self.maze[r, c] -= cv  # 벽을 깸
+                        self.maze[nr, nc] -= nv
+                        stack.append((nr, nc))  # 다음 좌표를 스택에 추가
 
 
     def create_maze_by_prim(self):

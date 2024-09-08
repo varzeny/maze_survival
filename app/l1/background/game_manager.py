@@ -1,15 +1,18 @@
 # background/game_manager.py
 
 #  lib
-
+from fastapi import WebSocket
 
 # module
+import app.l2.content as CONT
 
 # attribute
-GAMES = []
+GAME = None
 
 
 
 # method
-async def wait():
+def activate():
+    global GAME
+    GAME = CONT.Game()
     
