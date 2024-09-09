@@ -5,6 +5,7 @@ from fastapi import WebSocket
 import struct
 import copy
 from random import randint
+import json
 
 # module
 from .mazz_maker import *
@@ -23,16 +24,18 @@ __all__ = []
 타입 1 : 유저상태수신 = 타입(8), 
 타입 2 : 
 """
+SEND_TYPE_0 = 0
 SEND_TYPE_1 = 1 # 유저상태송신 = 타입(8), id(8), row(16), col(16)
-SEND_TYPE_2 = 2 # 미로송신 = 타입(8), 매트릭스(가변)
-SEND_TYPE_3 = 3 # 지도송신 = 타입(8), 매트릭스(가변)
+SEND_TYPE_2 = 2 # JSON송신 = 타입(8), 
+SEND_TYPE_3 = 3 # 매트릭스송신 = 타입(8), 매트릭스(가변)
 SEND_TYPE_4 = 4 # 주변정보송신 = 타입(8), 리스트[ (id(8), row(16), col(16))*n ]
 
 def send_type_1(id:int, r:int, c:int):
     return struct.pack("BBHH", SEND_TYPE_1, id, r, c)
 
-def send_type_2(matrix:np.ndarray):
-    return struct.pack("B", SEND_TYPE_2) + matrix.tobytes()
+def send_type_2(dic:dict):
+    json_data = json.dumps(dic)
+    return struct.pack("B", SEND_TYPE_2) + json_data.encode("utf-8")
 
 def send_type_3(matrix:np.ndarray):
     return struct.pack("B", SEND_TYPE_3) + matrix.tobytes()
@@ -55,15 +58,17 @@ class User:
 
     async def ws_accept(self):
         await self.ws.accept()
-        self.row = randint(0, self.map.shape[0])
-        self.col = randint(0, self.map.shape[1])
+        self.row = randint(0, self.map.shape[0]-1)
+        self.col = randint(0, self.map.shape[1]-1)
 
         # 초기화 데이터 보내주기
         reset_data = send_type_1(self.id, self.row, self.col)
         await self.ws.send_bytes( reset_data )
 
+        await self.ws.send_bytes( send_type_2( {"a":1, "b":{"aa":11,"bb":22}} ) )
+
         # 미로 보내기
-        maze_data = send_type_2(self.maze)
+        maze_data = send_type_3(self.maze)
         await self.ws.send_bytes( maze_data )
 
         # 지도 보내기
@@ -127,6 +132,13 @@ class User:
 
 class Game:
     instances:list["Game"] = []
+    config = {
+        "rows":100,
+        "cols":100,
+        "time":{
+            limit:500,
+        }
+    }
 
     # 이거 백그라운드에서 해야 하지 않나?
     @classmethod
