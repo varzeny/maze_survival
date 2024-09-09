@@ -170,7 +170,7 @@ class Game:
         self.maze:np.ndarray = None
         self.map:np.ndarray = None
         self.users:list = []
-        self.create_map(10, 10)
+        self.create_map(100, 100)
         Game.instances.append(self)
         print("game 추가됨 : ", len(Game.instances))
 
