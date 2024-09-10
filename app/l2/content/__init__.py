@@ -1,6 +1,7 @@
 # content/__init__.py
 
 # lib
+import os
 from fastapi import WebSocket
 import struct
 import copy
@@ -51,8 +52,6 @@ class User:
         self.maze:np.ndarray = maze
         self.map:np.ndarray = map
         self.ws:WebSocket = ws
-        # self.status1 = 0b0000000000000000
-        # self.status2 = 0b0000000000000000
         self.row:int = 0
         self.col:int = 0
 
@@ -126,63 +125,48 @@ class User:
 
 
 
-
-    
-
-
 class Game:
-    instances:list["Game"] = []
-    config = {
-        "rows":100,
-        "cols":100,
-        "time":{
-            limit:500,
-        }
-    }
+    instances:list = []
+    rows=os.getenv("GAME_ROWS")
+    cols=os.getenv("GAME_COLS")
+    colldown=os.getenv("GAME_COLLDOWN")
 
-    # 이거 백그라운드에서 해야 하지 않나?
     @classmethod
     def add_user(cls, ws:WebSocket):
-        if len(cls.instances) == 0:
-            cls.instances.append(Game())
-
-        big_game:Game = cls.instances[0]
+        tn, tg = 0, None
         for g in cls.instances:
-            if len(g.users) > len(big_game.users):
-                big_game = g
-        
-        u = User(
-            id=len(big_game.users)+1,
-            name=ws.cookies.get("game_token"),
-            maze=big_game.maze,
-            map=big_game.map,
-            ws=ws
-        )
-        big_game.users.append(u)
+            n = len(g.users)
+            if tn < n < 100:
+                tn, tg = n, g
+        if not tg:
+            tg = Game()
+            cls.instances.append(tg)
+                
+
+        for i in range(len(tg.users)):
+            if not tg.users[i]:
+                u = User(
+                    id = i+1, # 0은 지도행렬에서 비었음을 의미함
+                    name = ws.cookies.get("game_token"),
+                    maze = tg.maze,
+                    map = tg.map,
+                    ws = ws
+                )
+
+                
+        tg.users.append(u)
         print(f"{u.id}:{u.name} 유저 추가됨")
-        print("전체 유저 : ", big_game.users)
+        print("전체 유저 : ", tg.users)
 
-        return big_game, u
-        
-
-        # # 여기서 통신함
-        # await u.ws_accept()
-
-        # # 연결 끊김
-        # print(f"{u.id}:{u.name} 의 연결이 끊김")
-        # big_game.users.remove(u)
-
-
-
-
+        return tg, u
 
 
 
     def __init__(self) -> None:
         self.maze:np.ndarray = None
         self.map:np.ndarray = None
-        self.users:list = []
-        self.create_map(100, 100)
+        self.users:list = [None]*100
+        self.create_map(Game.rows, Game.cols)
         Game.instances.append(self)
         print("game 추가됨 : ", len(Game.instances))
 

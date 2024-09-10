@@ -35,19 +35,6 @@ async def websocket_endpoint(ws: WebSocket):
     g.users.remove(u)
 
 
-    # await ws.accept()  # WebSocket 연결을 수락
-    # try:
-    #     while True:
-    #         # 클라이언트로부터 메시지를 받음
-    #         data = await ws.receive_bytes()
-    #         print(f"Received message: {struct.unpack('B',data)[0]}")
-            
-    #         # 클라이언트로 메시지를 다시 보냄
-    #         # await ws.send_text(f"Message received: {data}")
-    # except Exception as e:
-    #     print(f"WebSocket connection error: {e}")
-
-
 
 @router.post("/start")
 async def get_html_root(req:Request):
