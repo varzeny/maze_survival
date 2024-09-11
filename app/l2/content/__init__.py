@@ -2,6 +2,7 @@
 
 # lib
 import os
+import asyncio
 from fastapi import WebSocket
 import struct
 import copy
@@ -46,31 +47,42 @@ def send_type_4():
 
 
 class User:
-    def __init__(self, id:int, name:str, maze:np.ndarray, map:np.ndarray, ws:WebSocket) -> None:
+    def __init__(self, id:int, name:str, maze:np.ndarray, map:np.ndarray, ws:WebSocket, row:int, col:int) -> None:
         self.id:int = id
         self.name:str = name
         self.maze:np.ndarray = maze
         self.map:np.ndarray = map
         self.ws:WebSocket = ws
-        self.row:int = 0
-        self.col:int = 0
+        self.row:int = row
+        self.col:int = col
 
     async def ws_accept(self):
         await self.ws.accept()
-        self.row = randint(0, self.map.shape[0]-1)
-        self.col = randint(0, self.map.shape[1]-1)
-
-        # 초기화 데이터 보내주기
-        reset_data = send_type_1(self.id, self.row, self.col)
-        await self.ws.send_bytes( reset_data )
-
-        await self.ws.send_bytes( send_type_2( {"a":1, "b":{"aa":11,"bb":22}} ) )
 
         # 미로 보내기
         maze_data = send_type_3(self.maze)
         await self.ws.send_bytes( maze_data )
 
-        # 지도 보내기
+        # 시작 좌표 배정
+        while True:
+            row_ = randint(0, self.map.shape[0]-1)
+            col_ = randint(0, self.map.shape[1]-1)
+            if self.map[row_, col_] == 0:
+                self.row, self.col = row_, col_
+                break
+
+        # 초기화 데이터 보내주기
+        ud = {
+            "id":self.id,
+            "name":self.name,
+            "row":self.row,
+            "col":self.col
+        }
+        reset_data = send_type_2( ud )
+        await self.ws.send_bytes( reset_data )
+
+        # 맵에 배치
+        self.map[self.row, self.col] = self.id
 
         try:
             while True:
@@ -127,45 +139,63 @@ class User:
 
 class Game:
     instances:list = []
-    rows=os.getenv("GAME_ROWS")
-    cols=os.getenv("GAME_COLS")
-    colldown=os.getenv("GAME_COLLDOWN")
+    rows=int( os.getenv("GAME_ROWS") )
+    cols=int( os.getenv("GAME_COLS") )
+    colldown=int( os.getenv("GAME_COLLDOWN") )
+    capa=100
+    vr = 4
 
     @classmethod
-    def add_user(cls, ws:WebSocket):
+    async def add_user(cls, ws:WebSocket):
+        # 게임 찾기
         tn, tg = 0, None
         for g in cls.instances:
             n = len(g.users)
-            if tn < n < 100:
+            if tn < n < cls.capa:
                 tn, tg = n, g
         if not tg:
             tg = Game()
             cls.instances.append(tg)
+            tg.count += 1
                 
-
-        for i in range(len(tg.users)):
+        # 유저의 자리 찾기
+        for i in range(1,cls.capa): # 0은 지도행렬에서 비었음을 의미함
             if not tg.users[i]:
-                u = User(
-                    id = i+1, # 0은 지도행렬에서 비었음을 의미함
-                    name = ws.cookies.get("game_token"),
-                    maze = tg.maze,
-                    map = tg.map,
-                    ws = ws
-                )
+                id_=i
+                break
+        
+        # 유저생성
+        u = User(
+            id = id_,
+            name = ws.cookies.get("game_token"),
+            maze = tg.maze,
+            map = tg.map,
+            ws = ws,
+            row=0,
+            col=0
+        )
+        tg.users[id_] = u
 
-                
-        tg.users.append(u)
         print(f"{u.id}:{u.name} 유저 추가됨")
         print("전체 유저 : ", tg.users)
 
-        return tg, u
+        # 송수신대기
+        await u.ws_accept()
 
+        # 연결 끊김
+        print(f"{u.id}:{u.name} 의 연결이 끊김")
+        tg.users.remove(u)
+        tg.count -= 1
 
 
     def __init__(self) -> None:
         self.maze:np.ndarray = None
         self.map:np.ndarray = None
         self.users:list = [None]*100
+        self.count = 0
+        self.is_active = asyncio.Event()
+
+
         self.create_map(Game.rows, Game.cols)
         Game.instances.append(self)
         print("game 추가됨 : ", len(Game.instances))
@@ -181,6 +211,23 @@ class Game:
         self.maze = copy.deepcopy( m.maze )
         del m
         self.map = np.full( (row, col), 0, dtype=np.uint8 )
+
+
+    async def manage(self):
+        while True:
+            await self.is_active.wait()
+            for u in  self.users:
+
+                rs = np.clip(u.row - Game.vs, 0, Game.rows)
+                re = np.clip(u.row + Game.vs, 0, Game.rows )
+                cs = np.clip(u.col - Game.vs, 0, Game.cols)
+                ce = np.clip(u.col + Game.vs, 0, Game.cols )
+
+                result = np.nonzero( self.map[rs:re, cs:ce] )
+                print(result)
+            
+            await asyncio.sleep(1)
+
 
 
 

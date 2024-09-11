@@ -1,6 +1,11 @@
 // home.js
 document.addEventListener("DOMContentLoaded", init);
 
+const remSize = parseFloat(getComputedStyle(document.documentElement).fontSize);
+const cellSize = remSize * 2;  // 셀 크기
+const rows = 100;
+const cols = 100;
+
 let WS;
 let keysPressed = 0;  // 비트 플래그로 눌린 키들을 저장 (1바이트로 관리)
 
@@ -15,15 +20,12 @@ const USER = {
     icon:null,
     ws:null,
     row:null,
-    col:null
+    col:null,
 }
 let MAZE = null;
-let MAP = null;
+// let MAP = new Uint8Array(rows, cols);
 
-const remSize = parseFloat(getComputedStyle(document.documentElement).fontSize);
-const cellSize = remSize * 2;  // 셀 크기
-const rows = 100;
-const cols = 100;
+
 
 // Maze 캔버스 세팅
 let mazeCanvas = null;
@@ -83,24 +85,40 @@ async function init() {
     });
 
     USER.ws.addEventListener("message", function(ev) {
+        try {
+
+        }catch(error){
+            console.error("통신 중 뭔가 오류 발생!!!!!!");
+            
+        }
         const resp = ev.data;
         const respData = new DataView(resp);
         const respType = respData.getUint8(0, true)
 
         switch(respType){
-            case 1: // 유저상태 수신
-                USER.id = respData.getUint8(1, true);
-                USER.name = CONTEXT.name;
-                USER.row = respData.getUint16(2, true);
-                USER.col = respData.getUint16(4, true);
-                console.log(USER);
+            case 1: //
+                // USER.id = respData.getUint8(1, true);
+                // USER.name = CONTEXT.name;
+                // USER.row = respData.getUint16(2, true);
+                // USER.col = respData.getUint16(4, true);
+
+                // (char, short, short) * n 개의 적들을 objCtx로 그리기
                 break;
-            case 2:
+            case 2: // json
                 const jsonStr = new TextDecoder("utf-8").decode(resp.slice(1));
                 const dic = JSON.parse( jsonStr );
-                console.log( dic );
+                USER.id = dic.id
+                USER.name = dic.name
+                USER.row = dic.row
+                USER.col = dic.col
+                console.log("유저 데이터 수신함 : ", USER);
+                // MAP[USER.row][USER.col] = USER.id
+
+                // 미로그리기
+                screenSetup();
+                console.log("시작")
                 break;
-            case 3:
+            case 3: // 행렬
                 const matrix = new Uint8Array( resp, 1 );
                 const maze = [];
                 for (let i = 0; i < rows; i++) {
@@ -108,10 +126,8 @@ async function init() {
                 }
                 MAZE = maze;
                 // showMaze(MAZE,rows,cols);
-                console.log(USER);
 
-                // 미로그리기
-                screenSetup();
+                console.log("미로 수신함")
                 break;
             default:
                 console.log("알 수 없는 타입");
