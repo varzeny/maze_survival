@@ -24,7 +24,16 @@ const USER = {
     col:null,
 }
 let MAZE = null;
-// let MAP = new Uint8Array(CONTEXT.rows, CONTEXT.cols);
+
+const b1 = new ArrayBuffer(5);
+const v1 = new DataView(b1);
+function reqType1(r,c){
+    v1.setUint8(0, 1);
+    v1.setUint16(1, r, true);
+    v1.setUint16(3, c, true);
+    USER.ws.send(b1);
+}
+
 
 
 
@@ -266,11 +275,10 @@ function cooldown(){
 }
 
 function move(){
+    reqType1(USER.row, USER.col);
     drawObj(USER);  // 캐릭터 위치 업데이트
     moveViewToCharacter(USER);  // 미로 이동
 }
-
-
 
 
 

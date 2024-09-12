@@ -87,9 +87,17 @@ class User:
         try:
             while True:
                 resp = await self.ws.receive_bytes()
-                cmd = struct.unpack("B", resp)[0]
-                print(f"{self.id}번 유저 {self.name} 의 커맨드 : {cmd}")
-                await self.cmd(cmd)
+                respData = struct.unpack("=BHH", resp)
+                print(respData)
+                if respData[0] == 1:
+                    nr, nc = respData[1], respData[2]
+                    if self.map[nr, nc] == 0:
+                        self.map[nr, nc] = self.id
+                        self.map[self.row, self.col] = 0
+                        self.row, self.col = nr, nc
+                    else:
+                        # 이벤트 화면으로
+                        pass
 
         except Exception as e:
             print("ERROR from ws : ", e)
@@ -99,40 +107,6 @@ class User:
                 await self.ws.close()
             except Exception as e:
                 print(f"WebSocket is already closed: {e}")
-
-
-    async def cmd(self, cmd):
-        nr, nc = self.row, self.col
-        # cmd 분석
-        if cmd & 0b00000001:
-            print("shift", end="")
-        if cmd & 0b00000010:
-            print("space", end="")
-        if cmd & 0b00000100:
-            print("q", end="")
-        if cmd & 0b00001000:
-            print("e", end="")
-        if cmd & 0b00010000:
-            print("w", end="")
-            nr-=1
-        if cmd & 0b00100000:
-            print("a", end="")
-            nc-=1
-        if cmd & 0b01000000:
-            print("s", end="")
-            nr+=1
-        if cmd & 0b10000000:
-            print("d", end="")
-            nc+=1
-
-
-        if self.map[nr,nc] == 0:
-            self.map[nr,nc], self.map[self.row, self.col] = self.id, 0
-            self.row, self.col = nr, nc
-
-        msg = struct.pack("HHHH", self.row, self.col, self.status1, self.status2)
-
-        await self.ws.send_bytes(msg)
 
 
 
@@ -239,6 +213,7 @@ class Game:
                 rs, cs = np.nonzero( sm )
                 vs = sm[rs, cs]
                 print( rs, cs, vs)
+
 
 
 

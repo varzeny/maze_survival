@@ -39,9 +39,6 @@ async def websocket_endpoint(ws: WebSocket):
 
 
 
-
-
-
 @router.post("/start")
 async def get_html_root(req:Request):
     reqData = await req.json()
