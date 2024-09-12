@@ -23,7 +23,20 @@ async def websocket_endpoint(ws: WebSocket):
     name = ws.cookies.get("game_token")
     print("ws-name : ", name)
 
-    await CONT.Game.add_user(ws)
+    g:CONT.Game = CONT.Game.find_game()
+    u:CONT.User = await g.add_user(ws)
+
+    await u.ws_accept()
+
+    # 연결이 끊어짐
+    await g.delete_user(u)
+    del u
+
+    # 사람 없는 게임 제거
+    if not g.users:
+        await CONT.Game.delete_game(g)
+        del g
+
 
 
 

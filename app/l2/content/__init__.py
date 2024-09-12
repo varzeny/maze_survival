@@ -3,7 +3,7 @@
 # lib
 import os
 import asyncio
-from fastapi import WebSocket
+from fastapi import WebSocket, BackgroundTasks
 import struct
 import copy
 from random import randint
@@ -65,8 +65,8 @@ class User:
 
         # 시작 좌표 배정
         while True:
-            row_ = randint(0, self.map.shape[0]-1)
-            col_ = randint(0, self.map.shape[1]-1)
+            row_ = randint(Game.cr, self.map.shape[0]-Game.cr-1)
+            col_ = randint(Game.cr, self.map.shape[1]-Game.cr-1)
             if self.map[row_, col_] == 0:
                 self.row, self.col = row_, col_
                 break
@@ -99,7 +99,6 @@ class User:
                 await self.ws.close()
             except Exception as e:
                 print(f"WebSocket is already closed: {e}")
-
 
 
     async def cmd(self, cmd):
@@ -138,15 +137,15 @@ class User:
 
 
 class Game:
-    instances:list = []
+    instances:list["Game"] = []
     rows=int( os.getenv("GAME_ROWS") )
     cols=int( os.getenv("GAME_COLS") )
     colldown=int( os.getenv("GAME_COLLDOWN") )
     capa=100
-    vr = 4
+    cr = 4
 
     @classmethod
-    async def add_user(cls, ws:WebSocket):
+    def find_game(cls)->"Game":
         # 게임 찾기
         tn, tg = 0, None
         for g in cls.instances:
@@ -155,80 +154,95 @@ class Game:
                 tn, tg = n, g
         if not tg:
             tg = Game()
-            cls.instances.append(tg)
-            tg.count += 1
-                
-        # 유저의 자리 찾기
-        for i in range(1,cls.capa): # 0은 지도행렬에서 비었음을 의미함
-            if not tg.users[i]:
-                id_=i
-                break
-        
-        # 유저생성
-        u = User(
-            id = id_,
-            name = ws.cookies.get("game_token"),
-            maze = tg.maze,
-            map = tg.map,
-            ws = ws,
-            row=0,
-            col=0
-        )
-        tg.users[id_] = u
-
-        print(f"{u.id}:{u.name} 유저 추가됨")
-        print("전체 유저 : ", tg.users)
-
-        # 송수신대기
-        await u.ws_accept()
-
-        # 연결 끊김
-        print(f"{u.id}:{u.name} 의 연결이 끊김")
-        tg.users.remove(u)
-        tg.count -= 1
+        return tg
+    
+    @classmethod
+    async def delete_game(cls, g:"Game"):
+        try:
+            # 테스크 먼저 정리
+            for t in g.tasks:
+                t.cancel()
+            
+            # 인스턴스 리스트에서 제거
+            Game.instances.remove(g)
+            print("game 제거됨")
+            print( "현재 게임들 : ", Game.instances )
+            
+        except Exception as e:
+            print("ERROR from Game's instance.__del__ : ", e)
 
 
     def __init__(self) -> None:
+        Game.instances.append(self)
         self.maze:np.ndarray = None
         self.map:np.ndarray = None
-        self.users:list = [None]*100
-        self.count = 0
-        self.is_active = asyncio.Event()
-
-
-        self.create_map(Game.rows, Game.cols)
-        Game.instances.append(self)
+        self.users:list[User] = []
+        self.tasks:list = []
+        self.setup()
         print("game 추가됨 : ", len(Game.instances))
 
 
-    def __del__(self):
-        print("game 제거됨 : ", len(Game.instances))
+    def setup(self):
+        self.maze = self.create_maze(Game.rows, Game.cols)
+        self.map = np.full((Game.rows, Game.cols), 0, dtype=np.uint8)
+        self.tasks.append(
+            asyncio.create_task( self.manage() )
+        )
 
 
-    def create_map(self, row, col):
-        m = MazeManager(row, col)
+    def create_maze(self, row, col):
+        m = MazeManager(row-(Game.cr*2), col-(Game.cr*2))
         m.create_maze_by_DFS()
-        self.maze = copy.deepcopy( m.maze )
+        maze = copy.deepcopy( m.maze )
+        # 패딩두르기
+        pad_maze = np.pad(maze, pad_width=Game.cr, mode="constant", constant_values=15)
+        
         del m
-        self.map = np.full( (row, col), 0, dtype=np.uint8 )
+        return pad_maze
+
+
+    async def add_user(self, ws:WebSocket)->User:
+        # 빈 id 찾기
+        used = [ u.id for u in self.users ]
+        for i in range(1,100):
+            if i not in used:
+                break
+
+        # 유저생성
+        u = User(
+            id = i,
+            name = ws.cookies.get("game_token"),
+            maze = self.maze,
+            map = self.map,
+            ws = ws,
+            row = Game.cr,
+            col = Game.cr
+        )
+        self.users.append(u)
+        return u
+    
+    async def delete_user(self, u:User):
+        self.users.remove(u)
+        print(f"{u.id}:{u.name} 유저가 삭제됨")
+        print("현재 유저들 : ", [u.id for u in self.users])
 
 
     async def manage(self):
+        print("manage 시작")
         while True:
-            await self.is_active.wait()
-            for u in  self.users:
+            for u in self.users:
+                # 슬라이싱
+                sm = self.map[u.row-Game.cr:u.row+Game.cr+1, u.col-Game.cr:u.col+Game.cr+1]
+                print(sm)
 
-                rs = np.clip(u.row - Game.vs, 0, Game.rows)
-                re = np.clip(u.row + Game.vs, 0, Game.rows )
-                cs = np.clip(u.col - Game.vs, 0, Game.cols)
-                ce = np.clip(u.col + Game.vs, 0, Game.cols )
+                # 근처 유저id 검색
+                rs, cs = np.nonzero( sm )
+                vs = sm[rs, cs]
+                print( rs, cs, vs)
 
-                result = np.nonzero( self.map[rs:re, cs:ce] )
-                print(result)
-            
+
+
             await asyncio.sleep(1)
-
-
 
 
 

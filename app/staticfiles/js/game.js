@@ -1,15 +1,16 @@
 // home.js
 document.addEventListener("DOMContentLoaded", init);
 
-const remSize = parseFloat(getComputedStyle(document.documentElement).fontSize);
-const cellSize = remSize * 2;  // 셀 크기
-const rows = 100;
-const cols = 100;
-
 let WS;
 let keysPressed = 0;  // 비트 플래그로 눌린 키들을 저장 (1바이트로 관리)
 
-const CONTEXT = {}
+const CONTEXT = {
+    remSize:null,
+    cellSize:null, // 셀 크기
+    rows:100,
+    cols:100,
+    vc:4
+}
 const TIME = {
     limit:500,
     last:null
@@ -23,7 +24,7 @@ const USER = {
     col:null,
 }
 let MAZE = null;
-// let MAP = new Uint8Array(rows, cols);
+// let MAP = new Uint8Array(CONTEXT.rows, CONTEXT.cols);
 
 
 
@@ -51,21 +52,22 @@ const keyMap = {
 
 async function init() {
     // context 불러오기 /////////////////////////////////////////////
-    CONTEXT.name = document.getElementById("context").getAttribute("data-name");
-
+    // CONTEXT.name = document.getElementById("context").getAttribute("data-name");
+    CONTEXT.remSize = parseFloat(getComputedStyle(document.documentElement).fontSize);
+    CONTEXT.cellSize = CONTEXT.remSize * 2
 
     // 주요 변수들 세팅 ////////////////////////////////////////////////
     // Maze 캔버스 세팅
     mazeCanvas = document.getElementById("maze-canvas");
     mazeCtx = mazeCanvas.getContext("2d");
-    mazeCanvas.width = cols * cellSize;
-    mazeCanvas.height = rows * cellSize;
+    mazeCanvas.width = CONTEXT.cols * CONTEXT.cellSize;
+    mazeCanvas.height = CONTEXT.rows * CONTEXT.cellSize;
 
     // Obj 캔버스 세팅
     objCanvas = document.getElementById("obj-canvas");
     objCtx = objCanvas.getContext("2d");
-    objCanvas.width = cols * cellSize;
-    objCanvas.height = rows * cellSize;
+    objCanvas.width = CONTEXT.cols * CONTEXT.cellSize;
+    objCanvas.height = CONTEXT.rows * CONTEXT.cellSize;
 
 
     // USER 세팅
@@ -121,11 +123,11 @@ async function init() {
             case 3: // 행렬
                 const matrix = new Uint8Array( resp, 1 );
                 const maze = [];
-                for (let i = 0; i < rows; i++) {
-                    maze.push(matrix.slice(i * cols, (i + 1) * cols));
+                for (let i = 0; i < CONTEXT.rows; i++) {
+                    maze.push(matrix.slice(i * CONTEXT.cols, (i + 1) * CONTEXT.cols));
                 }
                 MAZE = maze;
-                // showMaze(MAZE,rows,cols);
+                // showMaze(MAZE,CONTEXT.rows,CONTEXT.cols);
 
                 console.log("미로 수신함")
                 break;
@@ -155,13 +157,13 @@ function screenSetup(){
 
 function drawMaze(){
     // 미로 그리기
-    for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-            const x = c * cellSize;
-            const y = r * cellSize;
+    for (let r = 0; r < CONTEXT.rows; r++) {
+        for (let c = 0; c < CONTEXT.cols; c++) {
+            const x = c * CONTEXT.cellSize;
+            const y = r * CONTEXT.cellSize;
 
             mazeCtx.fillStyle = "white";
-            mazeCtx.fillRect(x, y, cellSize, cellSize);
+            mazeCtx.fillRect(x, y, CONTEXT.cellSize, CONTEXT.cellSize);
 
             mazeCtx.strokeStyle = "black";
             mazeCtx.lineWidth = 2;
@@ -169,16 +171,16 @@ function drawMaze(){
             // 오른쪽 벽 (비트 2)
             if (MAZE[r][c] & 2) {
                 mazeCtx.beginPath();
-                mazeCtx.moveTo(x + cellSize, y);
-                mazeCtx.lineTo(x + cellSize, y + cellSize);
+                mazeCtx.moveTo(x + CONTEXT.cellSize, y);
+                mazeCtx.lineTo(x + CONTEXT.cellSize, y + CONTEXT.cellSize);
                 mazeCtx.stroke();
             }
 
             // 아래쪽 벽 (비트 4)
             if (MAZE[r][c] & 4) {
                 mazeCtx.beginPath();
-                mazeCtx.moveTo(x, y + cellSize);
-                mazeCtx.lineTo(x + cellSize, y + cellSize);
+                mazeCtx.moveTo(x, y + CONTEXT.cellSize);
+                mazeCtx.lineTo(x + CONTEXT.cellSize, y + CONTEXT.cellSize);
                 mazeCtx.stroke();
             }
         }
@@ -190,13 +192,13 @@ function drawObj(obj){
     objCtx.clearRect(0, 0, objCanvas.width, objCanvas.height);
 
     // 재설정
-    const x = obj.col * cellSize;
-    const y = obj.row * cellSize;
+    const x = obj.col * CONTEXT.cellSize;
+    const y = obj.row * CONTEXT.cellSize;
 
     // 캐릭터 그리기
     objCtx.fillStyle = "blue";
     objCtx.beginPath();
-    objCtx.arc(x + cellSize / 2, y + cellSize / 2, cellSize / 3, 0, Math.PI * 2);
+    objCtx.arc(x + CONTEXT.cellSize / 2, y + CONTEXT.cellSize / 2, CONTEXT.cellSize / 3, 0, Math.PI * 2);
     objCtx.fill();
 }
 
@@ -205,8 +207,8 @@ function drawObj(obj){
 function moveViewToCharacter(obj) {
 
     // 중앙에 위치할 캐릭터의 좌표 계산
-    const offsetX = (obj.col * cellSize) - (5 * cellSize);  // 화면의 중앙에 맞춰 이동
-    const offsetY = (obj.row * cellSize) - (5 * cellSize);
+    const offsetX = (obj.col * CONTEXT.cellSize) - (5 * CONTEXT.cellSize);  // 화면의 중앙에 맞춰 이동
+    const offsetY = (obj.row * CONTEXT.cellSize) - (5 * CONTEXT.cellSize);
 
     // 미로와 캐릭터의 위치 이동 (CSS transform 사용)
     mazeCanvas.style.transform = `translate(${-offsetX}px, ${-offsetY}px)`;
@@ -221,7 +223,7 @@ function keyDown(ev) {
     switch (ev.key) {
         case "w":
             if(cooldown()){ break; }
-            if (USER.row > 0) {
+            if (USER.row > CONTEXT.vc) {
                 USER.row--;
                 move();
             }
@@ -229,7 +231,7 @@ function keyDown(ev) {
 
         case "a":
             if(cooldown()){ break; }
-            if (USER.col > 0) {
+            if (USER.col > CONTEXT.vc) {
                 USER.col--;
                 move();
             }
@@ -237,7 +239,7 @@ function keyDown(ev) {
 
         case "s":
             if(cooldown()){ break; }
-            if (USER.row < 99) {
+            if (USER.row < CONTEXT.rows-CONTEXT.vc-1) {
                 USER.row++;
                 move();
             }
@@ -245,7 +247,7 @@ function keyDown(ev) {
 
         case "d":
             if(cooldown()){ break; }
-            if (USER.col < 99) {
+            if (USER.col < CONTEXT.rows-CONTEXT.vc-1) {
                 USER.col++;
                 move();
             }
