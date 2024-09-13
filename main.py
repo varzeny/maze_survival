@@ -1,6 +1,7 @@
 # main.py
 
 # lib
+import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, BackgroundTasks, staticfiles
 
@@ -10,18 +11,20 @@ load_dotenv()
 # module
 from app.l1.foreground.routers.common import router as common_router
 from app.l1.foreground.routers.content import router as content_router
-import app.l1.background.game_manager as GM
+import app.l2.content as CONT
 
 # method
 async def statup():
     print()
 
     # content
-    # GM.activate()
-
-
-
-    return
+    CONT.Game.setup(
+        size_r = int( os.getenv("GAME_ROWS") ),
+        size_c = int( os.getenv("GAME_COLS") ),
+        max_u = int( os.getenv("GAME_MAX_U") ),
+        ar = int( os.getenv("GAME_AOU_RANGE") ),
+        cooldown = int( os.getenv("GAME_COLLDOWN") )
+    )
 
 
 async def shutdown():
