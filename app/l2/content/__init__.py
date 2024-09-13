@@ -32,8 +32,8 @@ SEND_TYPE_2 = 2 # JSON송신 = 타입(8),
 SEND_TYPE_3 = 3 # 매트릭스송신 = 타입(8), 매트릭스(가변)
 SEND_TYPE_4 = 4 # 주변정보송신 = 타입(8), 리스트[ (id(8), row(16), col(16))*n ]
 
-def send_type_1(id:int, r:int, c:int):
-    return struct.pack("BBHH", SEND_TYPE_1, id, r, c)
+def send_type_1(vs:int, rs:int, cs:int):
+    return struct.pack(">BBHH", SEND_TYPE_1, vs, rs, cs)
 
 def send_type_2(dic:dict):
     json_data = json.dumps(dic)
@@ -55,6 +55,7 @@ class User:
         self.ws:WebSocket = ws
         self.row:int = row
         self.col:int = col
+        self.aou = {}
 
     async def ws_accept(self):
         await self.ws.accept()
@@ -88,15 +89,16 @@ class User:
             while True:
                 resp = await self.ws.receive_bytes()
                 respData = struct.unpack("=BHH", resp)
-                print(respData)
                 if respData[0] == 1:
                     nr, nc = respData[1], respData[2]
                     if self.map[nr, nc] == 0:
                         self.map[nr, nc] = self.id
                         self.map[self.row, self.col] = 0
                         self.row, self.col = nr, nc
+                        print(f"{self.id} : {self.row}, {self.col}")
                     else:
                         # 이벤트 화면으로
+                        print("겹침!!!!!!!!!!!!!!!!!!!!!")
                         pass
 
         except Exception as e:
@@ -104,6 +106,7 @@ class User:
 
         finally:
             try:
+                self.map[self.row, self.col] = 0
                 await self.ws.close()
             except Exception as e:
                 print(f"WebSocket is already closed: {e}")
@@ -192,6 +195,7 @@ class Game:
             row = Game.cr,
             col = Game.cr
         )
+        print("신규 id : ", u.id)
         self.users.append(u)
         return u
     
@@ -207,15 +211,25 @@ class Game:
             for u in self.users:
                 # 슬라이싱
                 sm = self.map[u.row-Game.cr:u.row+Game.cr+1, u.col-Game.cr:u.col+Game.cr+1]
-                print(sm)
+                # print(sm)
+                base_r, base_c = u.row-Game.cr, u.col-Game.cr
+                # print(base_r, base_c)
 
                 # 근처 유저id 검색
                 rs, cs = np.nonzero( sm )
-                vs = sm[rs, cs]
-                print( rs, cs, vs)
-
-
-
+                if rs.shape[0] > 1:
+                    # print("누군가 있음")
+                    vs = sm[rs, cs]
+                    # print( rs, cs, vs)
+                    # id, row, col을 반복 전달하는 방식
+                    for i in range(rs.shape[0]):
+                        # print(f"{vs[i]} 가 {base_r+rs[i]}, {base_c+cs[i]} 에 있음!")
+                        asyncio.create_task(
+                            u.ws.send_bytes( send_type_1(vs[i], base_r+rs[i], base_c+cs[i]) )
+                        )
+                else:
+                    # print("아무도 없음")
+                    pass
 
             await asyncio.sleep(1)
 

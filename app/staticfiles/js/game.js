@@ -15,15 +15,28 @@ const TIME = {
     limit:500,
     last:null
 }
+let MAZE = null;
+
+
+class Obj {
+    constructor(id,roll,row=0, col=0){
+        this.id = id,
+        this.roll = roll
+        this.row = row,
+        this.col = col
+    }
+}
+
 const USER = {
     id:null,
     name:null,
-    icon:null,
     ws:null,
     row:null,
     col:null,
+    aou:{}
 }
-let MAZE = null;
+
+
 
 const b1 = new ArrayBuffer(5);
 const v1 = new DataView(b1);
@@ -37,6 +50,7 @@ function reqType1(r,c){
 
 
 
+
 // Maze 캔버스 세팅
 let mazeCanvas = null;
 let mazeCtx = null;
@@ -46,18 +60,6 @@ let objCanvas = null;
 let objCtx = null;
 
 
-
-// 각 키에 대한 비트 매핑 (파이썬 코드 순서와 맞춤)
-const keyMap = {
-    "Shift": 0,  // Shift는 첫 번째 비트
-    " ": 1,      // Space는 두 번째 비트
-    "q": 2,      // Q는 세 번째 비트
-    "e": 3,      // E는 네 번째 비트
-    "w": 4,      // W는 다섯 번째 비트
-    "a": 5,      // A는 여섯 번째 비트
-    "s": 6,      // S는 일곱 번째 비트
-    "d": 7       // D는 여덟 번째 비트
-};
 
 async function init() {
     // context 불러오기 /////////////////////////////////////////////
@@ -108,6 +110,11 @@ async function init() {
 
         switch(respType){
             case 1: //
+                const v = respData.getUint8(1)
+                const r = respData.getUint16(2)
+                const c = respData.getUint16(4)
+
+                console.log(`${v} 가 ${r},${c} 에 있음!`);
                 // USER.id = respData.getUint8(1, true);
                 // USER.name = CONTEXT.name;
                 // USER.row = respData.getUint16(2, true);
