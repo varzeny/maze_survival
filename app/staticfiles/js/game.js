@@ -12,7 +12,7 @@ const CONTEXT = {
     vc:4
 }
 const TIME = {
-    limit:500,
+    limit:10,
     last:null
 }
 let MAZE = null;
@@ -42,8 +42,8 @@ const b1 = new ArrayBuffer(5);
 const v1 = new DataView(b1);
 function reqType1(r,c){
     v1.setUint8(0, 1);
-    v1.setUint16(1, r, true);
-    v1.setUint16(3, c, true);
+    v1.setUint16(1, r);
+    v1.setUint16(3, c);
     USER.ws.send(b1);
 }
 

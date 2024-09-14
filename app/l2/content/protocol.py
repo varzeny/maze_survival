@@ -1,6 +1,7 @@
 # content/protocol.py
 
 # lib
+import asyncio
 import struct
 import numpy as np
 from fastapi import WebSocket
@@ -8,9 +9,13 @@ import json
 # define
 
 # send
-async def send_type_1(ws:WebSocket, )->bool:  # 갱신
+def send_type_1(ws:WebSocket, vs:np.ndarray, rs:np.ndarray, cs:np.ndarray, base_r:int, base_c:int)->bool:  # 갱신
     try:
-        return
+        for i in range(vs.size):
+            asyncio.create_task(
+                ws.send_bytes( struct.pack(">BBHH", 1, vs[i], base_r+rs[i], base_c+cs[i]) )
+            )
+        return True
     except Exception as e:
         print("ERROR from send_type_1 : ", e)
 

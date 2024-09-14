@@ -32,6 +32,8 @@ class Game:
     cooldown:int = 0
     maze:np.ndarray = None
     map:np.ndarray = None
+    near:set[int] = set()
+    flag_near = asyncio.Event()
 
 
     @classmethod
@@ -48,6 +50,34 @@ class Game:
             constant_values=15
         )
         cls.map = np.full( (size_r, size_c), 0, dtype=np.uint8 )
+        asyncio.create_task( cls.update_near() )
+
+
+    @classmethod
+    async def update_near(cls):
+        print("update_near 시작됨")
+        while True:
+            await cls.flag_near.wait()
+            await asyncio.sleep(0.1)
+            for id in list(cls.near):
+                u = cls.users[id]
+                base_r, base_c = u.row-cls.ar, u.col-cls.ar
+                sm = cls.map[u.row-cls.ar:u.row+cls.ar+1, u.col-cls.ar:u.col+cls.ar+1]
+                rs, cs = np.nonzero(sm)
+                print(f"{u.id} : {sm}")
+                if rs.size > 1:
+                    print(f"{u.id} 에 근접있음")
+                    vs = sm[rs, cs]
+                    cls.near.update(vs)
+                    send_type_1(u.ws, vs, rs, cs, base_r, base_c)
+                    
+                else:
+                    print(f"{u.id} 에 근접없음")
+                    cls.near.discard(id)
+                    if len(cls.near) == 0:
+                        cls.flag_near.clear()
+                        print("플래그 내림")
+
 
     @classmethod
     def add_user(cls, ws:WebSocket):
@@ -94,50 +124,72 @@ class Game:
 
             while True:
                 resp = await u.ws.receive_bytes()
-                cmd, msg = resp[0], resp[1:]
-                print("cmd : ",cmd, "    ", "msg : ",msg)
+                cmd = resp[0]
                 if cmd == 1:
-                    print(1)
+                    r, c = struct.unpack(">HH", resp[1:])
+                    if cls.map[r,c] == 0:
+                        cls.map[r,c] = u.id
+                        cls.map[u.row, u.col] = 0
+                        u.row, u.col = r, c
+                        print(r,c, cls.near)
+
+                        # 주변확인
+                        if u.id not in cls.near:
+                            sm = cls.map[u.row-cls.ar:u.row+cls.ar+1, u.col-cls.ar:u.col+cls.ar+1]
+                            rs, cs = np.nonzero(sm)
+                            if rs.size > 1:
+                                vs = sm[rs, cs]
+                                cls.near.update(vs)
+                                if not cls.flag_near.is_set():
+                                    cls.flag_near.set()
+                    else:
+                        print("겹침 !!")
+
                 elif cmd == 2:
                     print(2)
                 
-
         except Exception as e:
             print("ERROR from play : ", e)
 
         finally:
             try:
                 cls.map[u.row, u.col] = 0
+                cls.near.discard(u.id)
                 u = cls.users.pop(u.id)
                 await u.ws.close()
             except Exception as e:
                 print(e)
-    
+
 
     @classmethod
     def find_starting(cls):
         while True:
             r = np.random.randint(cls.ar, cls.size_r-cls.ar)
             c = np.random.randint(cls.ar, cls.size_c-cls.ar)
-            sm = cls.map[r-cls.ar:r+cls.ar, c-cls.ar:c+cls.ar]
+            sm = cls.map[r-cls.ar:r+cls.ar+1, c-cls.ar:c+cls.ar+1]
             rs, cs = np.nonzero(sm)
             if rs.size == 0:
                 break
         return r, c
     
 
-    @classmethod
-    async def check_ar(cls):
-        while True:
-            asyncio.sleep(0.5)
-            for u in cls.users.values():
-                sm = cls.map[u.row-cls.ar:u.row+cls.ar, u.col-cls.ar:u.col+cls.ar]
-                rs, cs = np.nonzero(cls.map)
-                if rs.size > 1:
-                    mask = ~((rs == 4) & (cs == 4))
-                    rs, cs = rs[mask], cs[mask]
-                    u.aou = sm[rs, cs]
+    # @classmethod
+    # async def check_ar(cls):
+    #     while True:
+    #         asyncio.sleep(0.5)
+    #         for u in cls.users.values():
+    #             sm = cls.map[u.row-cls.ar:u.row+cls.ar, u.col-cls.ar:u.col+cls.ar]
+    #             rs, cs = np.nonzero(cls.map)
+    #             if rs.size > 1:
+    #                 mask = ~((rs == 4) & (cs == 4))
+    #                 rs, cs = rs[mask], cs[mask]
+    #                 u.aou = sm[rs, cs]
 
+
+    # @classmethod
+    # async def update_aou(cls, u:User):
+    #     while True:
+            
 
 
                     
