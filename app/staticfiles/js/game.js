@@ -1,9 +1,6 @@
 // home.js
 document.addEventListener("DOMContentLoaded", init);
 
-let WS;
-let keysPressed = 0;  // 비트 플래그로 눌린 키들을 저장 (1바이트로 관리)
-
 const CONTEXT = {
     remSize:null,
     cellSize:null, // 셀 크기
@@ -17,16 +14,6 @@ const TIME = {
 }
 let MAZE = null;
 
-
-class Obj {
-    constructor(id,roll,row=0, col=0){
-        this.id = id,
-        this.roll = roll
-        this.row = row,
-        this.col = col
-    }
-}
-
 const USER = {
     id:null,
     name:null,
@@ -37,7 +24,6 @@ const USER = {
 }
 
 
-
 const b1 = new ArrayBuffer(5);
 const v1 = new DataView(b1);
 function reqType1(r,c){
@@ -46,9 +32,6 @@ function reqType1(r,c){
     v1.setUint16(3, c);
     USER.ws.send(b1);
 }
-
-
-
 
 
 // Maze 캔버스 세팅
@@ -93,7 +76,7 @@ async function init() {
     });
 
     USER.ws.addEventListener("close", function(ev) {
-        console.log("WS is disconnected !");
+        alert(`WS is disconnected. code:${ev.code}, reason:${ev.reason}`);
         window.location.href = "/";
     });
 
@@ -106,20 +89,22 @@ async function init() {
         }
         const resp = ev.data;
         const respData = new DataView(resp);
-        const respType = respData.getUint8(0, true)
+        const respType = respData.getUint8(0)
 
         switch(respType){
             case 1: //
-                const v = respData.getUint8(1)
-                const r = respData.getUint16(2)
-                const c = respData.getUint16(4)
+                objCtx.clearRect(0, 0, objCanvas.width, objCanvas.height);
+                const len = respData.getUint8(1)
+                for(let i=0; i<len;i++){
+                    temp = i*5
+                    const v = respData.getUint8(2+temp);
+                    const r = respData.getUint16(3+temp);
+                    const c = respData.getUint16(5+temp);
 
-                console.log(`${v} 가 ${r},${c} 에 있음!`);
-                // USER.id = respData.getUint8(1, true);
-                // USER.name = CONTEXT.name;
-                // USER.row = respData.getUint16(2, true);
-                // USER.col = respData.getUint16(4, true);
+                    console.log(`${v} 가 ${r},${c} 에 있음!`);
+                    drawObjs(v, r, c);
 
+                }
                 // (char, short, short) * n 개의 적들을 objCtx로 그리기
                 break;
             case 2: // json
@@ -145,7 +130,19 @@ async function init() {
                 MAZE = maze;
                 // showMaze(MAZE,CONTEXT.rows,CONTEXT.cols);
 
-                console.log("미로 수신함")
+                console.log("미로 수신함");
+                break;
+            case 250:
+                USER.row = respData.getUint16(1);
+                USER.col = respData.getUint16(3);
+                console.log("contact : ", USER.row, USER.col);
+                
+
+                break;
+            case 255:
+                console.log("로딩 완료 !")
+                document.getElementsByClassName("loading")[0].style.display = "none";
+                document.getElementsByClassName("maze")[0].style.display = "block";
                 break;
             default:
                 console.log("알 수 없는 타입");
@@ -163,11 +160,121 @@ async function init() {
     console.log("home.js 로드 완료");
 }
 
+function drawObjs(v, r, c){
+    const x = c * CONTEXT.cellSize;
+    const y = r * CONTEXT.cellSize;
+
+    // 캐릭터 그리기
+    if(0<v && v<101){   // 유저
+        if(v==USER.id){ objCtx.fillStyle = "blue"; }
+        else{ objCtx.fillStyle = "red"; }
+    }else if(101<v && v<201){
+        console.log();
+    }else if(201<v && v<256){
+        if(v==250){ objCtx.fillStyle = "black"; }
+    }else{
+        console.log();
+    }
+
+    objCtx.beginPath();
+    objCtx.arc(x + CONTEXT.cellSize / 2, y + CONTEXT.cellSize / 2, CONTEXT.cellSize / 3, 0, Math.PI * 2);
+    objCtx.fill();
+}
+
 
 function screenSetup(){
     drawMaze();
-    drawObj(USER);
+    drawObj(USER.row, USER.col);
     moveViewToCharacter(USER);
+}
+
+function keyDown(ev) {
+
+    switch (ev.key) {
+        case "w":
+            if(cooldown()){ break; }
+            if (USER.row > CONTEXT.vc) {
+                eraseObj(USER.row, USER.col);
+                USER.row--;
+                drawObj(USER.row, USER.col);
+                move();
+            }
+            break;
+
+        case "a":
+            if(cooldown()){ break; }
+            if (USER.col > CONTEXT.vc) {
+                eraseObj(USER.row, USER.col);
+                USER.col--;
+                drawObj(USER.row, USER.col);
+                move();
+            }
+            break;
+
+        case "s":
+            if(cooldown()){ break; }
+            if (USER.row < CONTEXT.rows-CONTEXT.vc-1) {
+                eraseObj(USER.row, USER.col);
+                USER.row++;
+                drawObj(USER.row, USER.col);
+                move();
+            }
+            break;
+
+        case "d":
+            if(cooldown()){ break; }
+            if (USER.col < CONTEXT.rows-CONTEXT.vc-1) {
+                eraseObj(USER.row, USER.col);
+                USER.col++;
+                drawObj(USER.row, USER.col);
+                move();
+            }
+            break;
+    }
+    console.log(USER.row, USER.col)
+}
+
+function cooldown(){
+    const now = new Date().getTime();
+    if(now - TIME.last > TIME.limit){
+        TIME.last = now;
+        return false;
+    }
+    else{ return true; }
+}
+
+function eraseObj(r, c){
+    const x = c * CONTEXT.cellSize;
+    const y = r * CONTEXT.cellSize;
+
+    objCtx.clearRect(x, y, CONTEXT.cellSize, CONTEXT.cellSize)
+}
+
+function drawObj(r, c){
+    const x = c * CONTEXT.cellSize;
+    const y = r * CONTEXT.cellSize;
+
+    objCtx.fillStyle = "blue";
+    objCtx.beginPath();
+    objCtx.arc(x + CONTEXT.cellSize / 2, y + CONTEXT.cellSize / 2, CONTEXT.cellSize / 3, 0, Math.PI * 2);
+    objCtx.fill();
+}
+
+function move(){
+    reqType1(USER.row, USER.col);
+    moveViewToCharacter(USER);  // 미로 이동
+}
+
+
+function moveViewToCharacter(obj) {
+
+    // 중앙에 위치할 캐릭터의 좌표 계산
+    const offsetX = (obj.col * CONTEXT.cellSize) - (5 * CONTEXT.cellSize);  // 화면의 중앙에 맞춰 이동
+    const offsetY = (obj.row * CONTEXT.cellSize) - (5 * CONTEXT.cellSize);
+
+    // 미로와 캐릭터의 위치 이동 (CSS transform 사용)
+    mazeCanvas.style.transform = `translate(${-offsetX}px, ${-offsetY}px)`;
+    objCanvas.style.transform = `translate(${-offsetX}px, ${-offsetY}px)`;
 }
 
 
@@ -203,89 +310,7 @@ function drawMaze(){
     }
 }
 
-function drawObj(obj){
-    // Obj 캔버스 백지화
-    objCtx.clearRect(0, 0, objCanvas.width, objCanvas.height);
 
-    // 재설정
-    const x = obj.col * CONTEXT.cellSize;
-    const y = obj.row * CONTEXT.cellSize;
-
-    // 캐릭터 그리기
-    objCtx.fillStyle = "blue";
-    objCtx.beginPath();
-    objCtx.arc(x + CONTEXT.cellSize / 2, y + CONTEXT.cellSize / 2, CONTEXT.cellSize / 3, 0, Math.PI * 2);
-    objCtx.fill();
-}
-
-
-
-function moveViewToCharacter(obj) {
-
-    // 중앙에 위치할 캐릭터의 좌표 계산
-    const offsetX = (obj.col * CONTEXT.cellSize) - (5 * CONTEXT.cellSize);  // 화면의 중앙에 맞춰 이동
-    const offsetY = (obj.row * CONTEXT.cellSize) - (5 * CONTEXT.cellSize);
-
-    // 미로와 캐릭터의 위치 이동 (CSS transform 사용)
-    mazeCanvas.style.transform = `translate(${-offsetX}px, ${-offsetY}px)`;
-    objCanvas.style.transform = `translate(${-offsetX}px, ${-offsetY}px)`;
-}
-
-
-
-
-function keyDown(ev) {
-
-    switch (ev.key) {
-        case "w":
-            if(cooldown()){ break; }
-            if (USER.row > CONTEXT.vc) {
-                USER.row--;
-                move();
-            }
-            break;
-
-        case "a":
-            if(cooldown()){ break; }
-            if (USER.col > CONTEXT.vc) {
-                USER.col--;
-                move();
-            }
-            break;
-
-        case "s":
-            if(cooldown()){ break; }
-            if (USER.row < CONTEXT.rows-CONTEXT.vc-1) {
-                USER.row++;
-                move();
-            }
-            break;
-
-        case "d":
-            if(cooldown()){ break; }
-            if (USER.col < CONTEXT.rows-CONTEXT.vc-1) {
-                USER.col++;
-                move();
-            }
-            break;
-    }
-    console.log(USER.row, USER.col)
-}
-
-function cooldown(){
-    const now = new Date().getTime();
-    if(now - TIME.last > TIME.limit){
-        TIME.last = now;
-        return false;
-    }
-    else{ return true; }
-}
-
-function move(){
-    reqType1(USER.row, USER.col);
-    drawObj(USER);  // 캐릭터 위치 업데이트
-    moveViewToCharacter(USER);  // 미로 이동
-}
 
 
 
@@ -312,27 +337,3 @@ function showMaze(maze, rows, cols) {
 
     console.log(mazeStr);
 }
-
-
-
-
-
-
-
-
-// function keyDown(ev) {
-//     if (keyMap.hasOwnProperty(ev.key)) {
-//         keysPressed |= (1 << keyMap[ev.key]);  // 해당 비트를 1로 설정
-//         console.log(Date.now(), keysPressed)
-//         // sendState();
-//     }
-// }
-
-// function keyUp(ev) {
-//     if (keyMap.hasOwnProperty(ev.key)) {
-//         keysPressed &= ~(1 << keyMap[ev.key]);  // 해당 비트를 0으로 설정
-//         // console.log(Date.now(), keysPressed)
-
-//         // sendState();
-//     }
-// }

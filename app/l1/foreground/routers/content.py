@@ -22,10 +22,15 @@ template = Jinja2Templates("app/templates")
 async def websocket_endpoint(ws: WebSocket):
     name = ws.cookies.get("game_token")
     print("ws-name : ", name)
-
-    u = CONT.Game.add_user(ws)
     print("현재 접속자 : ", list( CONT.Game.users.keys() ))
 
+    u = CONT.Game.add_user(ws)
+    if not u:
+        print("인원이 꽉참")
+        ws.close(code=4403, reason="no more spare in game")
+        return 
+
+    # 유저가 있으면
     await CONT.Game.play(u)
     del u
     print("연결 종료")

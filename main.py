@@ -22,7 +22,7 @@ async def statup():
         size_r = int( os.getenv("GAME_ROWS") ),
         size_c = int( os.getenv("GAME_COLS") ),
         max_u = int( os.getenv("GAME_MAX_U") ),
-        ar = int( os.getenv("GAME_AOU_RANGE") ),
+        near_r = int( os.getenv("GAME_NEAR_RANGE") ),
         cooldown = int( os.getenv("GAME_COLLDOWN") )
     )
 

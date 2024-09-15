@@ -15,26 +15,41 @@
 
     </aside>
     <main>
-        <section class="screen">
-            <div class="container-canvas">
-                <canvas id="maze-canvas"></canvas>
-                <canvas id="obj-canvas"></canvas>
+        <section class="maze">
+            <div class="screen">
+                <div class="container-canvas">
+                    <canvas id="maze-canvas"></canvas>
+                    <canvas id="obj-canvas"></canvas>
+                </div>
+            </div>
+
+            <div class="control">
+                <div class="state">
+                    NAME : {{ name }}
+                    HP : <span id="hp">0</span><br>
+                    MP : <span id="mp">0</span>
+                </div>
+                <div class="consol">
+                    consol
+                </div>
+                <div class="etc">
+                    etc
+                </div>
             </div>
         </section>
 
-        <section class="control">
-            <div class="state">
-                NAME : {{ name }}
-                HP : <span id="hp">0</span><br>
-                MP : <span id="mp">0</span>
-            </div>
-            <div class="consol">
-                consol
-            </div>
-            <div class="etc">
-                etc
+
+        <section class="contact">
+
+        </section>
+
+        <section class="loading">
+            <div>
+                Loading...                
             </div>
         </section>
+
+
     </main>
 </body>
 </html>

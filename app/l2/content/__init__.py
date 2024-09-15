@@ -28,7 +28,7 @@ class Game:
     size_r:int = 0
     size_c:int = 0
     max_u:int = 0
-    ar:int = 0                  # update range, aou range
+    near_r:int = 0
     cooldown:int = 0
     maze:np.ndarray = None
     map:np.ndarray = None
@@ -37,15 +37,15 @@ class Game:
 
 
     @classmethod
-    def setup(cls, size_r:int, size_c:int, max_u:int, ar:int, cooldown:int):
+    def setup(cls, size_r:int, size_c:int, max_u:int, near_r:int, cooldown:int):
         cls.size_r = size_r
         cls.size_c = size_c
         cls.max_u = max_u
-        cls.ar = ar
+        cls.near_r = near_r
         cls.cooldown = cooldown
         cls.maze = np.pad(
-            array = MAZE.create_maze_by_DFS(size_r-(cls.ar*2), size_c-(cls.ar*2)),
-            pad_width=cls.ar,
+            array = MAZE.create_maze_by_DFS(size_r-(cls.near_r*2), size_c-(cls.near_r*2)),
+            pad_width=cls.near_r,
             mode="constant",
             constant_values=15
         )
@@ -61,22 +61,25 @@ class Game:
             await asyncio.sleep(0.1)
             for id in list(cls.near):
                 u = cls.users[id]
-                base_r, base_c = u.row-cls.ar, u.col-cls.ar
-                sm = cls.map[u.row-cls.ar:u.row+cls.ar+1, u.col-cls.ar:u.col+cls.ar+1]
+                base_r, base_c = u.row-cls.near_r, u.col-cls.near_r
+                sm = cls.map[u.row-cls.near_r:u.row+cls.near_r+1, u.col-cls.near_r:u.col+cls.near_r+1]
                 rs, cs = np.nonzero(sm)
-                print(f"{u.id} : {sm}")
+                vs = sm[rs, cs]
+
+                # print(f"{u.id} : {sm}")
                 if rs.size > 1:
-                    print(f"{u.id} 에 근접있음")
-                    vs = sm[rs, cs]
+                    # print(f"{u.id} 에 근접있음")
                     cls.near.update(vs)
                     send_type_1(u.ws, vs, rs, cs, base_r, base_c)
                     
                 else:
-                    print(f"{u.id} 에 근접없음")
+                    # print(f"{u.id} 에 근접없음")
+                    send_type_1(u.ws, vs, rs, cs, base_r, base_c)
                     cls.near.discard(id)
+                    print(f"{id} 가 update_near 에서 벗어남!")
                     if len(cls.near) == 0:
                         cls.flag_near.clear()
-                        print("플래그 내림")
+                        print("near가 비었음. 플래그 내림")
 
 
     @classmethod
@@ -84,12 +87,12 @@ class Game:
         used = [ k for k in cls.users.keys() ]
         for i in range(1, cls.max_u):
             if not i in used:
-                break
+                u = User(i, ws.cookies.get("game_token"), ws)
+                cls.users[i] = u
+                return u
+        return False
+            
 
-        u = User(i, ws.cookies.get("game_token"), ws)
-        cls.users[i] = u
-        return u
-    
     @classmethod
     async def play(cls, u:User):
         try:
@@ -126,16 +129,16 @@ class Game:
                 resp = await u.ws.receive_bytes()
                 cmd = resp[0]
                 if cmd == 1:
-                    r, c = struct.unpack(">HH", resp[1:])
-                    if cls.map[r,c] == 0:
-                        cls.map[r,c] = u.id
+                    nr, nc = struct.unpack(">HH", resp[1:])
+                    if cls.map[nr,nc] == 0:
                         cls.map[u.row, u.col] = 0
-                        u.row, u.col = r, c
-                        print(r,c, cls.near)
+                        u.row, u.col = nr, nc
+                        cls.map[nr,nc] = u.id
+                        print(f"{u.id} : {nr}, {nc}, {cls.near}")
 
                         # 주변확인
                         if u.id not in cls.near:
-                            sm = cls.map[u.row-cls.ar:u.row+cls.ar+1, u.col-cls.ar:u.col+cls.ar+1]
+                            sm = cls.map[u.row-cls.near_r:u.row+cls.near_r+1, u.col-cls.near_r:u.col+cls.near_r+1]
                             rs, cs = np.nonzero(sm)
                             if rs.size > 1:
                                 vs = sm[rs, cs]
@@ -144,6 +147,9 @@ class Game:
                                     cls.flag_near.set()
                     else:
                         print("겹침 !!")
+                        o_id = cls.map[nr, nc]
+                        o:User = cls.users[ o_id ]
+                        asyncio.create_task( cls.contact_stage( nr, nc, o, u ) )
 
                 elif cmd == 2:
                     print(2)
@@ -164,33 +170,34 @@ class Game:
     @classmethod
     def find_starting(cls):
         while True:
-            r = np.random.randint(cls.ar, cls.size_r-cls.ar)
-            c = np.random.randint(cls.ar, cls.size_c-cls.ar)
-            sm = cls.map[r-cls.ar:r+cls.ar+1, c-cls.ar:c+cls.ar+1]
+            r = np.random.randint(cls.near_r, cls.size_r-cls.near_r)
+            c = np.random.randint(cls.near_r, cls.size_c-cls.near_r)
+            sm = cls.map[r-cls.near_r:r+cls.near_r+1, c-cls.near_r:c+cls.near_r+1]
             rs, cs = np.nonzero(sm)
             if rs.size == 0:
                 break
         return r, c
     
 
-    # @classmethod
-    # async def check_ar(cls):
-    #     while True:
-    #         asyncio.sleep(0.5)
-    #         for u in cls.users.values():
-    #             sm = cls.map[u.row-cls.ar:u.row+cls.ar, u.col-cls.ar:u.col+cls.ar]
-    #             rs, cs = np.nonzero(cls.map)
-    #             if rs.size > 1:
-    #                 mask = ~((rs == 4) & (cs == 4))
-    #                 rs, cs = rs[mask], cs[mask]
-    #                 u.aou = sm[rs, cs]
+    @classmethod
+    async def contact_stage(cls, row:int, col:int, o:User, u:User):
+        ok = await send_type_250(row, col, o.ws, u.ws)
+        if not ok:
+            return
+        
+        o.row, u.row = row, row
+        o.col, u.col = col, col
+        
+        # 지도정리
+        sm = cls.map[row-cls.near_r:row+cls.near_r, col-cls.near_r:col+cls.near_r]
+        op_r, op_c = np.where( (sm==o.id) )
+        up_r, up_c = np.where( (sm==u.id) )
+        # print(">>>>>>>>>>>>>>>>>>>>>>>>>op : ", op_r, op_c)
+        # print(">>>>>>>>>>>>>>>>>>>>>>>>>up : ", up_r, up_c)
+        cls.map[op_r, op_c] = 0
+        cls.map[up_r, up_c] = 0
+        cls.map[row, col] = 250
 
+        
 
-    # @classmethod
-    # async def update_aou(cls, u:User):
-    #     while True:
-            
-
-
-                    
-
+        return

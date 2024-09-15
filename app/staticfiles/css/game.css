@@ -10,44 +10,56 @@ main {
 }
 
     section {
-
+        width: 100%; height: 100%;
+        display: None;
     }
-        .screen {
-            width: 100%; height: 70%;
+        .maze {
+
+        }
+            .screen {
+                width: 100%; height: 70%;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+                .container-canvas {
+                    width: 22rem; height: 22rem;
+                    position: relative;
+                    overflow: hidden;
+                }
+                    .container-canvas canvas {
+                        position: absolute;
+                        top: 0; left: 0;
+                        /* image-rendering: pixelated; */
+                    }
+                        #obj-canvas {
+                            z-index: 1;
+                        }
+
+            .control {
+                width: 100%; height: 30%;
+                display: flex;
+            }
+                .state {
+                    width: 30%; height: 100%;
+                    background-color: brown;
+                }
+                .consol {
+                    width: 40%; height: 100%;
+                    background-color: cornflowerblue;
+                }
+                .etc {
+                    width: 30%; height: 100%;
+                    background-color: darkolivegreen;
+                }
+
+        .contact {
+
+        }
+
+
+        .loading {
             display: flex;
             justify-content: center;
             align-items: center;
         }
-            .container-canvas {
-                width: 22rem; height: 22rem;
-                position: relative;
-                overflow: hidden;
-            }
-                .container-canvas canvas {
-                    position: absolute;
-                    top: 0; left: 0;
-                    /* image-rendering: pixelated; */
-                }
-                    #obj-canvas {
-                        z-index: 1;
-                    }
-
-
-
-
-        .control {
-            width: 100%; height: 30%;
-            display: flex;
-        }
-            .state {
-                width: 30%; height: 100%;
-                background-color: brown;
-            }
-            .consol {
-                width: 40%; height: 100%;
-                background-color: cornflowerblue;
-            }
-            .etc {
-                width: 30%; height: 100%;
-                background-color: darkolivegreen;
-            }
