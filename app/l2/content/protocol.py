@@ -42,7 +42,17 @@ async def send_type_3(ws:WebSocket, matrix:np.ndarray)->bool:  # 행렬
 async def send_type_4():
     return
 
-async def send_type_250(row:int, col:int, o_ws:WebSocket, u_ws:WebSocket):  # 겹침
+def send_type_8(ws:WebSocket, row:int, col:int):
+    try:
+        asyncio.create_task(
+            ws.send_bytes( struct.pack(">BBHH", 8, 8, row, col) )
+        )
+    except Exception as e:
+        print("ERROR from send_type_8 : ", e)
+        
+    return
+
+async def send_type_250(row:int, col:int, o_ws:WebSocket, u_ws:WebSocket)->bool:  # 겹침
     try:
         msg = struct.pack(">BHH",250, row, col)
         await o_ws.send_bytes( msg )
@@ -50,8 +60,6 @@ async def send_type_250(row:int, col:int, o_ws:WebSocket, u_ws:WebSocket):  # �
         return True
     except Exception as e:
         print("ERROR from send_type_250 : ", e)
-        await o_ws.close(code=4403, reason="contact error")
-        await u_ws.close(code=4403, reason="contact error")
         return False
 
 async def send_type_255(ws:WebSocket)->bool:

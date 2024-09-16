@@ -20,7 +20,7 @@ class User:
         self.ws:WebSocket = ws
         self.row:int = 0
         self.col:int = 0
-        self.aou:np.ndarray = []
+        self.state:int = 0            # 0:로딩, 1:map, 8:contact
 
 
 class Game:
@@ -43,12 +43,7 @@ class Game:
         cls.max_u = max_u
         cls.near_r = near_r
         cls.cooldown = cooldown
-        cls.maze = np.pad(
-            array = MAZE.create_maze_by_DFS(size_r-(cls.near_r*2), size_c-(cls.near_r*2)),
-            pad_width=cls.near_r,
-            mode="constant",
-            constant_values=15
-        )
+        cls.maze = MAZE.create_maze_by_DFS(size_r, size_c, cls.near_r)
         cls.map = np.full( (size_r, size_c), 0, dtype=np.uint8 )
         asyncio.create_task( cls.update_near() )
 
@@ -123,33 +118,62 @@ class Game:
                 raise Exception("send start error")
             
             # 유저를 맵에 배치
+            u.state = 1
             cls.map[u.row, u.col] = u.id
 
             while True:
                 resp = await u.ws.receive_bytes()
                 cmd = resp[0]
                 if cmd == 1:
-                    nr, nc = struct.unpack(">HH", resp[1:])
-                    if cls.map[nr,nc] == 0:
-                        cls.map[u.row, u.col] = 0
-                        u.row, u.col = nr, nc
-                        cls.map[nr,nc] = u.id
-                        print(f"{u.id} : {nr}, {nc}, {cls.near}")
+                    if u.state == 1:
+                        nr, nc = struct.unpack(">HH", resp[1:])
+                        if cls.map[nr,nc] == 0:
+                            cls.map[u.row, u.col] = 0
+                            u.row, u.col = nr, nc
+                            cls.map[nr,nc] = u.id
+                            print(f"{u.id} : {nr}, {nc}, {cls.near}")
 
-                        # 주변확인
-                        if u.id not in cls.near:
-                            sm = cls.map[u.row-cls.near_r:u.row+cls.near_r+1, u.col-cls.near_r:u.col+cls.near_r+1]
-                            rs, cs = np.nonzero(sm)
-                            if rs.size > 1:
-                                vs = sm[rs, cs]
-                                cls.near.update(vs)
-                                if not cls.flag_near.is_set():
-                                    cls.flag_near.set()
-                    else:
-                        print("겹침 !!")
-                        o_id = cls.map[nr, nc]
-                        o:User = cls.users[ o_id ]
-                        asyncio.create_task( cls.contact_stage( nr, nc, o, u ) )
+                            # 업데이트 리스트 아니면 주변확인
+                            if u.id not in cls.near:
+                                sm = cls.map[u.row-cls.near_r:u.row+cls.near_r+1, u.col-cls.near_r:u.col+cls.near_r+1]
+                                rs, cs = np.nonzero(sm)
+                                if rs.size > 1:
+                                    vs = sm[rs, cs]
+                                    cls.near.update(vs)
+                                    if not cls.flag_near.is_set():
+                                        cls.flag_near.set()
+                        else:
+                            print("겹침 !!")
+                            o_id = cls.map[nr, nc]
+                            o:User = cls.users[ o_id ]
+
+                            # 이동 요청 씹기
+                            u.state, o.state = 8, 8
+
+                            # 두 유저에게 정지신호 발신
+                            ok = await send_type_250(nr, nc, o.ws, u.ws)
+                            if not ok:
+                                return
+
+                            # 지도에서 두 유저 지우기
+                            sm = cls.map[nr-cls.near_r:nr+cls.near_r, nc-cls.near_r:nc+cls.near_r]
+                            op_r, op_c = np.where( (sm==o.id) )
+                            up_r, up_c = np.where( (sm==u.id) )
+                            # print(">>>>>>>>>>>>>>>>>>>>>>>>>op : ", op_r, op_c)
+                            # print(">>>>>>>>>>>>>>>>>>>>>>>>>up : ", up_r, up_c)
+                            cls.map[op_r, op_c] = 0
+                            cls.map[up_r, up_c] = 0
+
+                            # 근접 업데이트에서 지우기
+                            cls.near.discard(u.id); print(f"{u.id} 가 near를 벗어남");
+                            cls.near.discard(o.id); print(f"{o.id} 가 near를 벗어남");
+
+                            # 두 유저의 위치정보를 contact 지점으로
+                            o.row, u.row = nr, nr
+                            o.col, u.col = nc, nc
+
+                            # contact 절차
+                            asyncio.create_task( cls.contact_stage( nr, nc, o, u ) )
 
                 elif cmd == 2:
                     print(2)
@@ -165,6 +189,22 @@ class Game:
                 await u.ws.close()
             except Exception as e:
                 print(e)
+    
+
+    @classmethod
+    async def contact_stage(cls, row:int, col:int, o:User, u:User):
+        # 미로 갱신
+        cls.maze[row, col] |= (8<<4)
+
+        # 모든 유저의 미로에 contact 지점 표시
+        for u in cls.users.values():
+            send_type_8(u.ws, row, col)
+
+
+
+        return
+    
+
 
 
     @classmethod
@@ -177,27 +217,3 @@ class Game:
             if rs.size == 0:
                 break
         return r, c
-    
-
-    @classmethod
-    async def contact_stage(cls, row:int, col:int, o:User, u:User):
-        ok = await send_type_250(row, col, o.ws, u.ws)
-        if not ok:
-            return
-        
-        o.row, u.row = row, row
-        o.col, u.col = col, col
-        
-        # 지도정리
-        sm = cls.map[row-cls.near_r:row+cls.near_r, col-cls.near_r:col+cls.near_r]
-        op_r, op_c = np.where( (sm==o.id) )
-        up_r, up_c = np.where( (sm==u.id) )
-        # print(">>>>>>>>>>>>>>>>>>>>>>>>>op : ", op_r, op_c)
-        # print(">>>>>>>>>>>>>>>>>>>>>>>>>up : ", up_r, up_c)
-        cls.map[op_r, op_c] = 0
-        cls.map[up_r, up_c] = 0
-        cls.map[row, col] = 250
-
-        
-
-        return

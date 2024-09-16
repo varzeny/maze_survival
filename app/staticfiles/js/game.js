@@ -20,7 +20,7 @@ const USER = {
     ws:null,
     row:null,
     col:null,
-    aou:{}
+    state:0     // 0:로딩, 1:map, 8:contact
 }
 
 
@@ -93,20 +93,21 @@ async function init() {
 
         switch(respType){
             case 1: //
-                objCtx.clearRect(0, 0, objCanvas.width, objCanvas.height);
-                const len = respData.getUint8(1)
-                for(let i=0; i<len;i++){
-                    temp = i*5
-                    const v = respData.getUint8(2+temp);
-                    const r = respData.getUint16(3+temp);
-                    const c = respData.getUint16(5+temp);
-
-                    console.log(`${v} 가 ${r},${c} 에 있음!`);
-                    drawObjs(v, r, c);
-
+                if(USER.state==1){
+                    objCtx.clearRect(0, 0, objCanvas.width, objCanvas.height);
+                    const len = respData.getUint8(1)
+                    for(let i=0; i<len;i++){
+                        temp = i*5
+                        const v = respData.getUint8(2+temp);
+                        const r = respData.getUint16(3+temp);
+                        const c = respData.getUint16(5+temp);
+    
+                        console.log(`${v} 가 ${r},${c} 에 있음!`);
+                        drawObjs(v, r, c);
+                    }
                 }
-                // (char, short, short) * n 개의 적들을 objCtx로 그리기
                 break;
+
             case 2: // json
                 const jsonStr = new TextDecoder("utf-8").decode(resp.slice(1));
                 const dic = JSON.parse( jsonStr );
@@ -117,10 +118,11 @@ async function init() {
                 console.log("유저 데이터 수신함 : ", USER);
                 // MAP[USER.row][USER.col] = USER.id
 
-                // 미로그리기
-                screenSetup();
-                console.log("시작")
+                // 미로에 유저 표시
+                drawObj(USER.row, USER.col);
+                moveViewToCharacter(USER);
                 break;
+
             case 3: // 행렬
                 const matrix = new Uint8Array( resp, 1 );
                 const maze = [];
@@ -131,19 +133,46 @@ async function init() {
                 // showMaze(MAZE,CONTEXT.rows,CONTEXT.cols);
 
                 console.log("미로 수신함");
-                break;
-            case 250:
-                USER.row = respData.getUint16(1);
-                USER.col = respData.getUint16(3);
-                console.log("contact : ", USER.row, USER.col);
-                
+
+                // 미로 그리기
+                for (let r = 0; r < CONTEXT.rows; r++) {
+                    for (let c = 0; c < CONTEXT.cols; c++) {
+                        drawCell(r, c);
+                    }
+                }
+                console.log("미로 그려냄");
 
                 break;
+
+            case 8: // 지도 갱신
+                const row = respData.getUint16(2);
+                const col = respData.getUint16(4);
+                MAZE[row][col] |= (8<<4)
+
+                // 셀 지우기
+                mazeCtx.clearRect(col * CONTEXT.cellSize, row * CONTEXT.cellSize, CONTEXT.cellSize, CONTEXT.cellSize);
+                drawCell(row, col);
+                break;
+
+            case 250:   // contact
+                USER.state = 8;
+                eraseObj(USER.row, USER.col);
+
+                USER.row = respData.getUint16(1);
+                USER.col = respData.getUint16(3);
+
+                // 맵 정리
+                objCtx.clearRect(0, 0, CONTEXT.rows*CONTEXT.cellSize, CONTEXT.cols*CONTEXT.cellSize);
+                console.log("contact : ", USER.row, USER.col);   
+                break;
+
             case 255:
                 console.log("로딩 완료 !")
                 document.getElementsByClassName("loading")[0].style.display = "none";
                 document.getElementsByClassName("maze")[0].style.display = "block";
+                USER.state = 1;
                 break;
+                
             default:
                 console.log("알 수 없는 타입");
         }
@@ -160,6 +189,7 @@ async function init() {
     console.log("home.js 로드 완료");
 }
 
+
 function drawObjs(v, r, c){
     const x = c * CONTEXT.cellSize;
     const y = r * CONTEXT.cellSize;
@@ -170,8 +200,6 @@ function drawObjs(v, r, c){
         else{ objCtx.fillStyle = "red"; }
     }else if(101<v && v<201){
         console.log();
-    }else if(201<v && v<256){
-        if(v==250){ objCtx.fillStyle = "black"; }
     }else{
         console.log();
     }
@@ -181,57 +209,65 @@ function drawObjs(v, r, c){
     objCtx.fill();
 }
 
-
-function screenSetup(){
-    drawMaze();
-    drawObj(USER.row, USER.col);
-    moveViewToCharacter(USER);
-}
-
 function keyDown(ev) {
-
-    switch (ev.key) {
-        case "w":
-            if(cooldown()){ break; }
-            if (USER.row > CONTEXT.vc) {
-                eraseObj(USER.row, USER.col);
-                USER.row--;
-                drawObj(USER.row, USER.col);
-                move();
-            }
+    switch(USER.state){
+        case 0: // 로딩 중
             break;
-
-        case "a":
-            if(cooldown()){ break; }
-            if (USER.col > CONTEXT.vc) {
-                eraseObj(USER.row, USER.col);
-                USER.col--;
-                drawObj(USER.row, USER.col);
-                move();
+        case 1: // map 상에 있음
+            switch (ev.key) {
+                case "w":
+                    if(cooldown()){ break; }
+                    if (USER.row > CONTEXT.vc) {
+                        eraseObj(USER.row, USER.col);
+                        USER.row--;
+                        drawObj(USER.row, USER.col);
+                        move();
+                    }
+                    break;
+        
+                case "a":
+                    if(cooldown()){ break; }
+                    if (USER.col > CONTEXT.vc) {
+                        eraseObj(USER.row, USER.col);
+                        USER.col--;
+                        drawObj(USER.row, USER.col);
+                        move();
+                    }
+                    break;
+        
+                case "s":
+                    if(cooldown()){ break; }
+                    if (USER.row < CONTEXT.rows-CONTEXT.vc-1) {
+                        eraseObj(USER.row, USER.col);
+                        USER.row++;
+                        drawObj(USER.row, USER.col);
+                        move();
+                    }
+                    break;
+        
+                case "d":
+                    if(cooldown()){ break; }
+                    if (USER.col < CONTEXT.rows-CONTEXT.vc-1) {
+                        eraseObj(USER.row, USER.col);
+                        USER.col++;
+                        drawObj(USER.row, USER.col);
+                        move();
+                    }
+                    break;
             }
+            console.log(USER.row, USER.col)
             break;
-
-        case "s":
-            if(cooldown()){ break; }
-            if (USER.row < CONTEXT.rows-CONTEXT.vc-1) {
-                eraseObj(USER.row, USER.col);
-                USER.row++;
-                drawObj(USER.row, USER.col);
-                move();
-            }
+        case 2: // 예비
             break;
-
-        case "d":
-            if(cooldown()){ break; }
-            if (USER.col < CONTEXT.rows-CONTEXT.vc-1) {
-                eraseObj(USER.row, USER.col);
-                USER.col++;
-                drawObj(USER.row, USER.col);
-                move();
+        case 8: // contact
+            console.log(ev.key);
+            switch (ev.key){
+                case '1':
+                    break;
             }
             break;
     }
-    console.log(USER.row, USER.col)
+
 }
 
 function cooldown(){
@@ -282,34 +318,99 @@ function drawMaze(){
     // 미로 그리기
     for (let r = 0; r < CONTEXT.rows; r++) {
         for (let c = 0; c < CONTEXT.cols; c++) {
-            const x = c * CONTEXT.cellSize;
-            const y = r * CONTEXT.cellSize;
-
-            mazeCtx.fillStyle = "white";
-            mazeCtx.fillRect(x, y, CONTEXT.cellSize, CONTEXT.cellSize);
-
-            mazeCtx.strokeStyle = "black";
-            mazeCtx.lineWidth = 2;
-
-            // 오른쪽 벽 (비트 2)
-            if (MAZE[r][c] & 2) {
-                mazeCtx.beginPath();
-                mazeCtx.moveTo(x + CONTEXT.cellSize, y);
-                mazeCtx.lineTo(x + CONTEXT.cellSize, y + CONTEXT.cellSize);
-                mazeCtx.stroke();
-            }
-
-            // 아래쪽 벽 (비트 4)
-            if (MAZE[r][c] & 4) {
-                mazeCtx.beginPath();
-                mazeCtx.moveTo(x, y + CONTEXT.cellSize);
-                mazeCtx.lineTo(x + CONTEXT.cellSize, y + CONTEXT.cellSize);
-                mazeCtx.stroke();
-            }
+            drawCell(r, c);
         }
     }
 }
 
+
+function drawCell(r, c){
+    const x = c * CONTEXT.cellSize;
+    const y = r * CONTEXT.cellSize;
+
+    mazeCtx.fillStyle = "white";
+    mazeCtx.fillRect(x, y, CONTEXT.cellSize, CONTEXT.cellSize);
+
+    mazeCtx.strokeStyle = "black";
+    mazeCtx.lineWidth = 2;
+
+    // 외곽 패딩 처리
+    if ((MAZE[r][c]&15) == 15){
+        mazeCtx.fillStyle = "black";
+        mazeCtx.fillRect(x, y, CONTEXT.cellSize, CONTEXT.cellSize);
+        return; // 패딩 처리된 셀은 벽이나 지형지물을 그리지 않음
+    }
+
+    // 오른쪽 벽 (비트 2)
+    if (MAZE[r][c] & 2) {
+        mazeCtx.beginPath();
+        mazeCtx.moveTo(x + CONTEXT.cellSize, y);
+        mazeCtx.lineTo(x + CONTEXT.cellSize, y + CONTEXT.cellSize);
+        mazeCtx.stroke();
+    }
+
+    // 아래쪽 벽 (비트 4)
+    if (MAZE[r][c] & 4) {
+        mazeCtx.beginPath();
+        mazeCtx.moveTo(x, y + CONTEXT.cellSize);
+        mazeCtx.lineTo(x + CONTEXT.cellSize, y + CONTEXT.cellSize);
+        mazeCtx.stroke();
+    }
+
+    // 지형지물
+    mazeObj = MAZE[r][c]>>4
+    switch (mazeObj) {
+        case 0: // 없음
+            break;
+        case 1: // 위층으로 (검은색 정삼각형)
+            mazeCtx.fillStyle = "black";
+            mazeCtx.beginPath();
+            mazeCtx.moveTo(x + CONTEXT.cellSize / 2, y);  // 꼭대기
+            mazeCtx.lineTo(x + CONTEXT.cellSize, y + CONTEXT.cellSize);  // 오른쪽 아래
+            mazeCtx.lineTo(x, y + CONTEXT.cellSize);  // 왼쪽 아래
+            mazeCtx.closePath();
+            mazeCtx.fill();
+            break;
+        case 2: // 아래층으로 (검은색 역삼각형)
+            mazeCtx.fillStyle = "black";
+            mazeCtx.beginPath();
+            mazeCtx.moveTo(x, y);  // 왼쪽 위
+            mazeCtx.lineTo(x + CONTEXT.cellSize, y);  // 오른쪽 위
+            mazeCtx.lineTo(x + CONTEXT.cellSize / 2, y + CONTEXT.cellSize);  // 아래쪽 중앙
+            mazeCtx.closePath();
+            mazeCtx.fill();
+            break;
+        case 3: // 상자 (갈색 네모)
+            mazeCtx.fillStyle = "brown";
+            mazeCtx.fillRect(x + CONTEXT.cellSize / 4, y + CONTEXT.cellSize / 4, CONTEXT.cellSize / 2, CONTEXT.cellSize / 2);
+            break;
+        case 4: // 함정 (주황 마름모)
+            mazeCtx.fillStyle = "orange";
+            mazeCtx.beginPath();
+            mazeCtx.moveTo(x + CONTEXT.cellSize / 2, y);  // 위쪽 중앙
+            mazeCtx.lineTo(x + CONTEXT.cellSize, y + CONTEXT.cellSize / 2);  // 오른쪽 중앙
+            mazeCtx.lineTo(x + CONTEXT.cellSize / 2, y + CONTEXT.cellSize);  // 아래쪽 중앙
+            mazeCtx.lineTo(x, y + CONTEXT.cellSize / 2);  // 왼쪽 중앙
+            mazeCtx.closePath();
+            mazeCtx.fill();
+            break;
+        case 8: // contact (빨간 엑스)
+            mazeCtx.strokeStyle = "red";
+            mazeCtx.lineWidth = 3;
+            mazeCtx.beginPath();
+            mazeCtx.moveTo(x + CONTEXT.cellSize / 4, y + CONTEXT.cellSize / 4);
+            mazeCtx.lineTo(x + 3 * CONTEXT.cellSize / 4, y + 3 * CONTEXT.cellSize / 4);
+            mazeCtx.stroke();
+    
+            mazeCtx.beginPath();
+            mazeCtx.moveTo(x + 3 * CONTEXT.cellSize / 4, y + CONTEXT.cellSize / 4);
+            mazeCtx.lineTo(x + CONTEXT.cellSize / 4, y + 3 * CONTEXT.cellSize / 4);
+            mazeCtx.stroke();
+            break;
+        default:
+            console.log("알 수 없는 지형지물");
+    }
+}
 
 
 
