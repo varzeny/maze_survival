@@ -23,6 +23,25 @@ const USER = {
     state:0     // 0:로딩, 1:map, 8:contact
 }
 
+const TAB = {
+    tabs:{
+        loading:null,
+        maze:null,
+        contact:null,
+    },
+    init:function(){
+        this.tabs.loading = document.getElementsByClassName("loading")[0];
+        this.tabs.maze = document.getElementsByClassName("maze")[0];
+        this.tabs.contact = document.getElementsByClassName("contact")[0];
+    },
+    changeTab:function(name){
+        for(let t in this.tabs){
+            if(t==name){ this.tabs[t].style.display = "block"; }
+            else{ this.tabs[t].style.display="none"; }
+        }
+    }
+}
+
 
 const b1 = new ArrayBuffer(5);
 const v1 = new DataView(b1);
@@ -43,6 +62,119 @@ let objCanvas = null;
 let objCtx = null;
 
 
+// CMD
+const CMD = {
+    // 0~9 시스템
+    0:(respData)=>{ // 게임 init
+        console.log("게임세팅 시작");
+    },
+    1:(respData)=>{ // 게임 deinit
+
+    },
+    2:(respData)=>{ // 
+
+    },
+
+    // 10~19 user
+    10:(respData)=>{ // user init
+        const jsonStr = new TextDecoder("utf-8").decode( new Uint8Array(respData.buffer).slice(1) );
+        const dic = JSON.parse( jsonStr );
+        USER.id = dic.id
+        USER.name = dic.name
+        console.log("유저 데이터 수신함 : ", USER);
+    },
+    11:(respData)=>{ // user deinit
+
+    },
+
+    // 20~29 maze
+    20:(respData)=>{ // maze init
+        const matrix = new Uint8Array( respData.buffer, 1 );
+        const maze = [];
+        for (let i = 0; i < CONTEXT.rows; i++) {
+            maze.push(matrix.slice(i * CONTEXT.cols, (i + 1) * CONTEXT.cols));
+        }
+        MAZE = maze;
+        // showMaze(MAZE,CONTEXT.rows,CONTEXT.cols);
+
+        console.log("미로 수신함");
+
+        // 미로 그리기
+        for (let r = 0; r < CONTEXT.rows; r++) {
+            for (let c = 0; c < CONTEXT.cols; c++) {
+                drawCell(r, c);
+            }
+        }
+        console.log("미로 그려냄");
+    },
+    21:(respData)=>{ // maze deinit
+
+    },
+    22:(respData)=>{ // maze 시작
+        USER.row = respData.getUint16(1)
+        USER.col = respData.getUint16(3)
+        USER.state = 1;
+
+        // 미로에 유저 표시
+        drawObj(USER.row, USER.col);
+        moveViewToCharacter(USER);
+        TAB.changeTab("maze");
+        console.log("maze 시작");
+    },
+    23:(respData)=>{ // 근접정보
+        if(USER.state==1){
+            objCtx.clearRect(0, 0, objCanvas.width, objCanvas.height);
+            const len = respData.getUint8(1)
+            for(let i=0; i<len;i++){
+                temp = i*5
+                const v = respData.getUint8(2+temp);
+                const r = respData.getUint16(3+temp);
+                const c = respData.getUint16(5+temp);
+
+                console.log(`${v} 가 ${r},${c} 에 있음!`);
+                drawObjs(v, r, c);
+            }
+        }
+    },
+    24:(respData)=>{ // maze 수정
+        const val = respData.getUint8(1);
+        const row = respData.getUint16(2);
+        const col = respData.getUint16(4);
+        MAZE[row][col] |= (val<<4)
+
+        // 셀 지우기
+        mazeCtx.clearRect(col * CONTEXT.cellSize, row * CONTEXT.cellSize, CONTEXT.cellSize, CONTEXT.cellSize);
+        drawCell(row, col);
+    },
+
+    // 30~39 contact
+    30:(respData)=>{ // contact init
+        USER.state = 2;
+        USER.row = respData.getUint16(1);
+        USER.col = respData.getUint16(3);
+
+        // 맵 정리
+        objCtx.clearRect(0, 0, CONTEXT.rows*CONTEXT.cellSize, CONTEXT.cols*CONTEXT.cellSize);
+        console.log("contact : ", USER.row, USER.col);   
+
+        // 상대 정보 
+        const jsonStr = new TextDecoder("utf-8").decode( new Uint8Array(respData.buffer).slice(5) );
+        const o = JSON.parse( jsonStr );
+        console.log(o);
+
+        // 화면에 표시
+        document.getElementById("name-u").innerHTML = USER.name;
+        document.getElementById("name-o").innerHTML = o.name;
+
+        TAB.changeTab("contact");
+
+    },
+    31:(respData)=>{ // contact deinit
+
+    }
+    
+}
+
 
 async function init() {
     // context 불러오기 /////////////////////////////////////////////
@@ -51,6 +183,10 @@ async function init() {
     CONTEXT.cellSize = CONTEXT.remSize * 2
 
     // 주요 변수들 세팅 ////////////////////////////////////////////////
+    // 탭 세팅
+    TAB.init();
+    TAB.changeTab("loading");
+
     // Maze 캔버스 세팅
     mazeCanvas = document.getElementById("maze-canvas");
     mazeCtx = mazeCanvas.getContext("2d");
@@ -91,91 +227,7 @@ async function init() {
         const respData = new DataView(resp);
         const respType = respData.getUint8(0)
 
-        switch(respType){
-            case 1: //
-                if(USER.state==1){
-                    objCtx.clearRect(0, 0, objCanvas.width, objCanvas.height);
-                    const len = respData.getUint8(1)
-                    for(let i=0; i<len;i++){
-                        temp = i*5
-                        const v = respData.getUint8(2+temp);
-                        const r = respData.getUint16(3+temp);
-                        const c = respData.getUint16(5+temp);
-    
-                        console.log(`${v} 가 ${r},${c} 에 있음!`);
-                        drawObjs(v, r, c);
-                    }
-                }
-                break;
-
-            case 2: // json
-                const jsonStr = new TextDecoder("utf-8").decode(resp.slice(1));
-                const dic = JSON.parse( jsonStr );
-                USER.id = dic.id
-                USER.name = dic.name
-                USER.row = dic.row
-                USER.col = dic.col
-                console.log("유저 데이터 수신함 : ", USER);
-                // MAP[USER.row][USER.col] = USER.id
-
-                // 미로에 유저 표시
-                drawObj(USER.row, USER.col);
-                moveViewToCharacter(USER);
-                break;
-
-            case 3: // 행렬
-                const matrix = new Uint8Array( resp, 1 );
-                const maze = [];
-                for (let i = 0; i < CONTEXT.rows; i++) {
-                    maze.push(matrix.slice(i * CONTEXT.cols, (i + 1) * CONTEXT.cols));
-                }
-                MAZE = maze;
-                // showMaze(MAZE,CONTEXT.rows,CONTEXT.cols);
-
-                console.log("미로 수신함");
-
-                // 미로 그리기
-                for (let r = 0; r < CONTEXT.rows; r++) {
-                    for (let c = 0; c < CONTEXT.cols; c++) {
-                        drawCell(r, c);
-                    }
-                }
-                console.log("미로 그려냄");
-
-                break;
-
-            case 8: // 지도 갱신
-                const row = respData.getUint16(2);
-                const col = respData.getUint16(4);
-                MAZE[row][col] |= (8<<4)
-
-                // 셀 지우기
-                mazeCtx.clearRect(col * CONTEXT.cellSize, row * CONTEXT.cellSize, CONTEXT.cellSize, CONTEXT.cellSize);
-                drawCell(row, col);
-                break;
-
-            case 250:   // contact
-                USER.state = 8;
-                eraseObj(USER.row, USER.col);
-
-                USER.row = respData.getUint16(1);
-                USER.col = respData.getUint16(3);
-
-                // 맵 정리
-                objCtx.clearRect(0, 0, CONTEXT.rows*CONTEXT.cellSize, CONTEXT.cols*CONTEXT.cellSize);
-                console.log("contact : ", USER.row, USER.col);   
-                break;
-
-            case 255:
-                console.log("로딩 완료 !")
-                document.getElementsByClassName("loading")[0].style.display = "none";
-                document.getElementsByClassName("maze")[0].style.display = "block";
-                USER.state = 1;
-                break;
-                
-            default:
-                console.log("알 수 없는 타입");
-        }
+        CMD[respType](respData);
     });
 
     USER.ws.addEventListener("error", function(ev) {

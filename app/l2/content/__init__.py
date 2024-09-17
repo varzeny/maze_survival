@@ -20,7 +20,7 @@ class User:
         self.ws:WebSocket = ws
         self.row:int = 0
         self.col:int = 0
-        self.state:int = 0            # 0:로딩, 1:map, 8:contact
+        self.state:int = 0            # 0:로딩, 1:map, 2:contact
 
 
 class Game:
@@ -65,11 +65,11 @@ class Game:
                 if rs.size > 1:
                     # print(f"{u.id} 에 근접있음")
                     cls.near.update(vs)
-                    send_type_1(u.ws, vs, rs, cs, base_r, base_c)
+                    send_23(u.ws, vs, rs, cs, base_r, base_c)
                     
                 else:
                     # print(f"{u.id} 에 근접없음")
-                    send_type_1(u.ws, vs, rs, cs, base_r, base_c)
+                    send_23(u.ws, vs, rs, cs, base_r, base_c)
                     cls.near.discard(id)
                     print(f"{id} 가 update_near 에서 벗어남!")
                     if len(cls.near) == 0:
@@ -94,26 +94,27 @@ class Game:
             # 연결승인
             await u.ws.accept()
 
-            # 미로보내기
-            ok = await send_type_3(u.ws, cls.maze)
+            # 시스템 init
+            ok = await send_0(u.ws)
             if not ok:
-                raise Exception("send Maze error")
+                raise Exception("init error")
             
-            # 게정 불러오기
-            pass
-            
-            # 시작 좌표 배정
-            u.row, u.col = cls.find_starting()
-
             # 유저 데이터 전달
-            ok = await send_type_2(
-                u.ws, {"id":u.id, "name":u.name, "row":u.row, "col":u.col}
-            )
+            ok = await send_10(u.ws, {
+                "id":u.id, "name":u.name
+            })
             if not ok:
                 raise Exception("send User error")
-            
+
+
+            # 미로보내기
+            ok = await send_20(u.ws, cls.maze)
+            if not ok:
+                raise Exception("send Maze error")
+
             # 게임 시작 신호
-            ok = await send_type_255(u.ws)
+            u.row, u.col = cls.find_starting() # 시작 좌표 배정
+            ok = await send_22(u.ws, u.row, u.col)
             if not ok:
                 raise Exception("send start error")
             
@@ -148,10 +149,10 @@ class Game:
                             o:User = cls.users[ o_id ]
 
                             # 이동 요청 씹기
-                            u.state, o.state = 8, 8
+                            u.state, o.state = 2, 2
 
-                            # 두 유저에게 정지신호 발신
-                            ok = await send_type_250(nr, nc, o.ws, u.ws)
+                            # 두 유저에게 contact init
+                            ok = await send_30(nr, nc, o, u)
                             if not ok:
                                 return
 
@@ -172,11 +173,15 @@ class Game:
                             o.row, u.row = nr, nr
                             o.col, u.col = nc, nc
 
-                            # contact 절차
-                            asyncio.create_task( cls.contact_stage( nr, nc, o, u ) )
+                            # 모든 유저에게 maze변화 지시
+                            asyncio.create_task( cls.change_maze( 8, nr, nc ) )
+
+
 
                 elif cmd == 2:
-                    print(2)
+                    if u.state == 2:
+                        pass
+
                 
         except Exception as e:
             print("ERROR from play : ", e)
@@ -192,13 +197,13 @@ class Game:
     
 
     @classmethod
-    async def contact_stage(cls, row:int, col:int, o:User, u:User):
+    async def change_maze(cls, val:int, row:int, col:int):
         # 미로 갱신
-        cls.maze[row, col] |= (8<<4)
+        cls.maze[row, col] |= (val<<4)
 
         # 모든 유저의 미로에 contact 지점 표시
         for u in cls.users.values():
-            send_type_8(u.ws, row, col)
+            send_24(u.ws, val, row, col)
 
 
 
@@ -217,3 +222,4 @@ class Game:
             if rs.size == 0:
                 break
         return r, c
+

@@ -32,6 +32,7 @@ async def websocket_endpoint(ws: WebSocket):
 
     # 유저가 있으면
     await CONT.Game.play(u)
+    
     del u
     print("연결 종료")
     print("현재 접속자 : ", list( CONT.Game.users.keys() ))

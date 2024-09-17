@@ -56,10 +56,26 @@ main {
         .contact {
 
         }
+            .panel-screen {
+                width: 100%; height: 50%;
+                border: 1px solid white;
+                display: flex;
+            }
+                .area-u {
+                    width: 50%; height: 100%;
+                    background-color: green;
+                }
+                .area-o {
+                    width: 50%; height: 100%;
+                    background-color: red;
+                }
+            .panel-control {
+                width: 100%; height: 50%;
+                border: 1px solid white;
+            }
 
 
         .loading {
-            display: flex;
             justify-content: center;
             align-items: center;
         }
