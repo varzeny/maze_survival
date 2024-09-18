@@ -248,7 +248,6 @@ class Game:
 
                             # 두 유저를 stage로 보내기
                             stage = Stage(nr, nc, u.id, o.id)
-                            
                             u.stage = stage.id
                             o.stage = stage.id
                             asyncio.create_task( stage.start() )
