@@ -47,7 +47,6 @@ class Manager:
             mode="constant",
             constant_values=15
         )
-
         return result
     
 
@@ -59,3 +58,56 @@ class Manager:
             if (map[r, c] >> 4) == 0:
                 map[r,c] |= (v<<4)
                 break
+
+
+
+
+
+    # def create_maze_by_prim(self):
+    #     # 초기화: 모든 셀을 벽으로 둘러싼 상태로 설정
+    #     self.maze = np.full((self.row, self.col), 15, dtype=np.uint8)
+        
+    #     # 시작점 설정
+    #     walls = []
+    #     r = np.random.randint(0, self.row)
+    #     c = np.random.randint(0, self.col)
+        
+    #     # 현재 셀을 방문 처리하고 그 주변 벽을 리스트에 추가
+    #     self.maze[r, c] = 0
+    #     walls.append((r, c))
+
+    #     while walls:
+    #         # 무작위로 벽을 선택
+    #         r, c = walls.pop(np.random.randint(len(walls)))
+
+    #         # 주위에 아직 방문하지 않은 셀이 있으면 벽을 허문다
+    #         for dr, dc, cv, nv in self.direction:
+    #             nr, nc = r + dr, c + dc
+    #             if (0 <= nr < self.row) and (0 <= nc < self.col):
+    #                 if self.maze[nr, nc] == 15:
+    #                     self.maze[r, c] -= cv
+    #                     self.maze[nr, nc] -= nv
+    #                     walls.append((nr, nc))
+
+
+    # def show_maze(self):
+    #     # 상단 벽 출력
+    #     maze_str = "+" + "------+" * self.col + "\n"
+
+    #     for r in range(self.row):
+    #         # 각 행의 세로 벽 출력
+    #         maze_str += "|"
+    #         for c in range(self.col):
+    #             # 셀 내부는 공백으로 채우고, 오른쪽에 벽이 있는지 확인
+    #             maze_str += "      |" if (self.maze[r, c] & 2) else "       "
+            
+    #         maze_str += "\n"
+
+    #         # 각 행의 가로 벽 출력
+    #         maze_str += "+"
+    #         for c in range(self.col):
+    #             # 아래쪽에 벽이 있는지 확인하고 출력
+    #             maze_str += "------+" if (self.maze[r, c] & 4) else "      +"
+    #         maze_str += "\n"
+
+    #     print(maze_str)

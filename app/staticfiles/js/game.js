@@ -6,7 +6,7 @@ const CONTEXT = {
     cellSize:null, // 셀 크기
     rows:100,
     cols:100,
-    vc:4
+    near_r:4
 }
 const TIME = {
     limit:10,
@@ -17,10 +17,13 @@ let MAZE = null;
 const USER = {
     id:null,
     name:null,
-    ws:null,
     row:null,
     col:null,
     state:0     // 0:로딩, 1:map, 8:contact
+}
+
+const OPPO = {
+    name:null
 }
 
 const TAB = {
@@ -43,16 +46,6 @@ const TAB = {
 }
 
 
-const b1 = new ArrayBuffer(5);
-const v1 = new DataView(b1);
-function reqType1(r,c){
-    v1.setUint8(0, 1);
-    v1.setUint16(1, r);
-    v1.setUint16(3, c);
-    USER.ws.send(b1);
-}
-
-
 // Maze 캔버스 세팅
 let mazeCanvas = null;
 let mazeCtx = null;
@@ -62,9 +55,92 @@ let objCanvas = null;
 let objCtx = null;
 
 
-// CMD
+SERVER = {
+    protocol:{
+        sendType1:{ b:null, v:null },
+        sendType2:{ b:null, v:null }
+    },
+    ws:null,
+    init:function(url){
+        // Protocol 설정
+        this.protocol.sendType1.b = new ArrayBuffer(5);
+        this.protocol.sendType1.v = new DataView(this.protocol.sendType1.b);
+
+        this.protocol.sendType2.b = new ArrayBuffer(2);
+        this.protocol.sendType2.v = new DataView(this.protocol.sendType2.b);
+
+        // WebSocket 설정
+        this.ws = new WebSocket(url);
+        this.ws.binaryType = "arraybuffer";
+        SERVER.ws.addEventListener("open", function(ev) {
+            console.log("WS is connected !");
+        });
+        SERVER.ws.addEventListener("close", function(ev) {
+            alert(`WS is disconnected. code:${ev.code}, reason:${ev.reason}`);
+            window.location.href = "/";
+        });
+        SERVER.ws.addEventListener("message", function(ev) {
+            const resp = ev.data;
+            const respData = new DataView(resp);
+            const respType = respData.getUint8(0)
+
+            CMD[respType](respData);
+        });
+        SERVER.ws.addEventListener("error", function(ev) {
+            console.error("WS error : ", ev);
+        });
+    },
+    send_1:function(r,c){
+        this.protocol.sendType1.v.setUint8(0, 1);
+        this.protocol.sendType1.v.setUint16(1, r);
+        this.protocol.sendType1.v.setUint16(3, c);
+        this.ws.send( this.protocol.sendType1.b );
+    },
+    send_2:function(choice){ // choice 1:r, 2:s, 3:p
+        this.protocol.sendType2.v.setUint8(0, 2);
+        this.protocol.sendType2.v.setUint8(1, choice);
+        this.ws.send( this.protocol.sendType2.b );
+    }
+}
+
+
+const CONTACT = {
+    turn:0,
+    time:5,
+    announce:null,
+    rsp:{ r:null, s:null, p:null },
+    choice:0,
+    init:function(){
+        document.getElementById("r").addEventListener("click",()=>{
+            this.choice = 1; console.log("너의 선택 : ", this.choice);
+        });
+        document.getElementById("s").addEventListener("click",()=>{ 
+            this.choice = 2; console.log("너의 선택 : ", this.choice);
+        });
+        document.getElementById("p").addEventListener("click",()=>{ 
+            this.choice = 3; console.log("너의 선택 : ", this.choice);
+        });
+        this.announce = document.getElementById("announce");
+    },
+    turnStart:function(){
+        this.time = 5;
+        this.choice = Math.floor(Math.random()*3)+1;
+        let interval = setInterval(()=>{
+            if(this.time==0){
+                // choice 를 서버로 보내기
+                SERVER.send_2(this.choice);
+                console.log(this.choice,"보냄!");
+                clearInterval(interval);
+            }
+            this.announce.innerHTML = this.time;
+            this.time--;
+        }, 1000);
+    },
+}
+
+
 const CMD = {
-    // 0~9 시스템
+    // 0~9 시스템 //////////////////////////////////////////////////////////
     0:(respData)=>{ // 게임 init
         console.log("게임세팅 시작");
     },
@@ -75,7 +151,7 @@ const CMD = {
 
     },
 
-    // 10~19 user
+    // 10~19 user //////////////////////////////////////////////////////////
     10:(respData)=>{ // user init
         const jsonStr = new TextDecoder("utf-8").decode( new Uint8Array(respData.buffer).slice(1) );
         const dic = JSON.parse( jsonStr );
@@ -87,7 +163,7 @@ const CMD = {
 
     },
 
-    // 20~29 maze
+    // 20~29 maze //////////////////////////////////////////////////////////
     20:(respData)=>{ // maze init
         const matrix = new Uint8Array( respData.buffer, 1 );
         const maze = [];
@@ -147,30 +223,55 @@ const CMD = {
         drawCell(row, col);
     },
 
-    // 30~39 contact
+    // 30~39 contact //////////////////////////////////////////////////////////
     30:(respData)=>{ // contact init
         USER.state = 2;
         USER.row = respData.getUint16(1);
         USER.col = respData.getUint16(3);
+        console.log("contact : ", USER.row, USER.col);   
+
+        // 화면전환
+        TAB.changeTab("loading");
+        setTimeout( TAB.changeTab("contact"), 2000 );
 
         // 맵 정리
         objCtx.clearRect(0, 0, CONTEXT.rows*CONTEXT.cellSize, CONTEXT.cols*CONTEXT.cellSize);
-        console.log("contact : ", USER.row, USER.col);   
 
         // 상대 정보 
         const jsonStr = new TextDecoder("utf-8").decode( new Uint8Array(respData.buffer).slice(5) );
         const o = JSON.parse( jsonStr );
         console.log(o);
+        OPPO.name = o.name
 
         // 화면에 표시
         document.getElementById("name-u").innerHTML = USER.name;
-        document.getElementById("name-o").innerHTML = o.name;
-
-        TAB.changeTab("contact");
+        document.getElementById("name-o").innerHTML = OPPO.name;
+        CONTACT.announce.innerHTML = "Ready~";
 
     },
     31:(respData)=>{ // contact deinit
 
+    },
+    32:(respData)=>{ // turn 시작
+        CONTACT.announce.innerHTML = "Start !";
+        CONTACT.turnStart();
+    },
+    33:(respData)=>{ // 턴 종료 & 결과
+        const result = respData.getUint8(1);
+        console.log(">>>>>>>결과<<<<<<<<", result);
+        if(result==0){
+            TAB.changeTab("lose");
+            setTimeout( ()=>{window.location.href="/"}, 2000 );
+        }else if(result==1){
+            CONTACT.announce.innerHTML="DRAW";
+            CONTACT.turnStart();
+        }else{
+            TAB.changeTab("win");
+            setTimeout( TAB.changeTab("maze"), 2000 );
+            drawObj(USER.row, USER.col);
+            moveViewToCharacter(USER);
+            USER.state = 1;
+        }
     }
     
 }
@@ -200,39 +301,13 @@ async function init() {
     objCanvas.height = CONTEXT.rows * CONTEXT.cellSize;
 
 
-    // USER 세팅
-    USER.name = CONTEXT.name
-    USER.ws = new WebSocket("wss://test.varzeny.com/ws-game");
-    USER.ws.binaryType = "arraybuffer";
-    
-    // WebSocket 이벤트 설정
-    USER.ws.addEventListener("open", function(ev) {
-        console.log("WS is connected !");
+    // SERVER 세팅
+    SERVER.init("wss://test.varzeny.com/ws-game");
 
-    });
 
-    USER.ws.addEventListener("close", function(ev) {
-        alert(`WS is disconnected. code:${ev.code}, reason:${ev.reason}`);
-        window.location.href = "/";
-    });
+    // contact 세팅
+    CONTACT.init();
 
-    USER.ws.addEventListener("message", function(ev) {
-        try {
-
-        }catch(error){
-            console.error("통신 중 뭔가 오류 발생!!!!!!");
-            
-        }
-        const resp = ev.data;
-        const respData = new DataView(resp);
-        const respType = respData.getUint8(0)
-
-        CMD[respType](respData);
-    });
-
-    USER.ws.addEventListener("error", function(ev) {
-        console.error("WS error : ", ev);
-    });
 
     // 키 이벤트 리스너 설정
     document.addEventListener("keydown", keyDown);
@@ -269,7 +344,7 @@ function keyDown(ev) {
             switch (ev.key) {
                 case "w":
                     if(cooldown()){ break; }
-                    if (USER.row > CONTEXT.vc) {
+                    if (USER.row > CONTEXT.near_r) {
                         eraseObj(USER.row, USER.col);
                         USER.row--;
                         drawObj(USER.row, USER.col);
@@ -279,7 +354,7 @@ function keyDown(ev) {
         
                 case "a":
                     if(cooldown()){ break; }
-                    if (USER.col > CONTEXT.vc) {
+                    if (USER.col > CONTEXT.near_r) {
                         eraseObj(USER.row, USER.col);
                         USER.col--;
                         drawObj(USER.row, USER.col);
@@ -289,7 +364,7 @@ function keyDown(ev) {
         
                 case "s":
                     if(cooldown()){ break; }
-                    if (USER.row < CONTEXT.rows-CONTEXT.vc-1) {
+                    if (USER.row < CONTEXT.rows-CONTEXT.near_r-1) {
                         eraseObj(USER.row, USER.col);
                         USER.row++;
                         drawObj(USER.row, USER.col);
@@ -299,7 +374,7 @@ function keyDown(ev) {
         
                 case "d":
                     if(cooldown()){ break; }
-                    if (USER.col < CONTEXT.rows-CONTEXT.vc-1) {
+                    if (USER.col < CONTEXT.rows-CONTEXT.near_r-1) {
                         eraseObj(USER.row, USER.col);
                         USER.col++;
                         drawObj(USER.row, USER.col);
@@ -349,7 +424,7 @@ function drawObj(r, c){
 }
 
 function move(){
-    reqType1(USER.row, USER.col);
+    SERVER.send_1(USER.row, USER.col);
     moveViewToCharacter(USER);  // 미로 이동
 }
 

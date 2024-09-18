@@ -26,7 +26,7 @@ async def send_10(ws:WebSocket, dic:dict)->bool:  # 유저
         await ws.send_bytes( struct.pack(">B",10) + json_data.encode("utf-8") )
         return True
     except Exception as e:
-        print("ERROR from send_type_2 : ", e)
+        print("ERROR from send_10 : ", e)
         return False
 
 async def send_20(ws:WebSocket, matrix:np.ndarray)->bool:  # 미로
@@ -34,7 +34,7 @@ async def send_20(ws:WebSocket, matrix:np.ndarray)->bool:  # 미로
         await ws.send_bytes( struct.pack(">B",20) + matrix.tobytes() )
         return True
     except Exception as e:
-        print("ERROR from send_type_3 : ", e)
+        print("ERROR from send_20 : ", e)
         return False
 
 async def send_22(ws:WebSocket, row:int, col:int)->bool:
@@ -42,7 +42,7 @@ async def send_22(ws:WebSocket, row:int, col:int)->bool:
         await ws.send_bytes( struct.pack(">BHH",22, row, col) )
         return True
     except Exception as e:
-        print("ERROR from send_type_255 : ", e)
+        print("ERROR from send_22 : ", e)
         return False
 
 def send_23(ws:WebSocket, vs:np.ndarray, rs:np.ndarray, cs:np.ndarray, base_r:int, base_c:int)->bool:  # 갱신
@@ -56,7 +56,7 @@ def send_23(ws:WebSocket, vs:np.ndarray, rs:np.ndarray, cs:np.ndarray, base_r:in
         )
         return True
     except Exception as e:
-        print("ERROR from send_type_1 : ", e)
+        print("ERROR from send_23 : ", e)
 
 def send_24(ws:WebSocket, val:int, row:int, col:int):
     try:
@@ -64,49 +64,42 @@ def send_24(ws:WebSocket, val:int, row:int, col:int):
             ws.send_bytes( struct.pack(">BBHH", 24, val, row, col) )
         )
     except Exception as e:
-        print("ERROR from send_type_8 : ", e)    
+        print("ERROR from send_24 : ", e)    
     return
 
-async def send_30(row:int, col:int, o, u)->bool:
+# contact 시작
+async def send_30(row:int, col:int, u, o)->bool:
     try:
-        await o.ws.send_bytes(
-            struct.pack(">BHH",30,row,col)+json.dumps(
-                { "name":u.name }
-            ).encode("utf-8")
-        )
         await u.ws.send_bytes(
-            struct.pack(">BHH",30,row,col)+json.dumps(
+            struct.pack(">BHH", 30, row, col)+json.dumps(
                 { "name":o.name }
             ).encode("utf-8")
         )
+        await o.ws.send_bytes(
+            struct.pack(">BHH", 30, row, col)+json.dumps(
+                { "name":u.name }
+            ).encode("utf-8")
+        )
+
         return True
     except Exception as e:
-        print("ERROR from send_type_250 : ", e)
+        print("ERROR from send_30 : ", e)
         return False
 
+# 턴시작
+async def send_32(ws:WebSocket)->bool:
+    try:
+        await ws.send_bytes( struct.pack(">B", 32) )
+        return True
+    except Exception as e:
+        print("ERROR from send_32 : ", e)
+        return False
 
-
-
-
-
-async def send_type_4():
-    return
-
-
-
-
-
-
-
-# recevie
-def receive_type_1():   # 제어
-    return
-
-def receive_type_2():   
-    return
-
-def receive_type_3():
-    return
-
-def receive_type_4():
-    return
+# 턴 매치 결과
+async def send_33(ws:WebSocket, result:int)->bool:
+    try:
+        await ws.send_bytes( struct.pack(">BB", 33, result) )
+        return True
+    except Exception as e:
+        print("ERROR from send_33 : ", e)
+        return False
