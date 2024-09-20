@@ -3,7 +3,7 @@
 # lib
 import asyncio
 import numpy as np
-from fastapi import WebSocket
+from fastapi import WebSocket, WebSocketDisconnect
 
 # module
 from .protocol import *
@@ -14,6 +14,24 @@ __all__ = []
 
 
 class User:
+    instances:dict[int,"User"] = {}
+
+    @classmethod
+    def create_user(cls, name:str, ws:WebSocket):
+        used_id = list(cls.instances.keys())
+        for i in range( 1, len(cls.instances)+2 ):
+            if i not in used_id:
+                cls.instances[i] = cls(i, name, ws)
+                print(f"새로운 유저의 ID 는 {i}, 현재유저목록 : {cls.instances.keys()}")
+                return cls.instances[i]
+
+    @classmethod
+    async def delete_user(cls, u_id:int):
+        # 자원정리
+        u = cls.instances.pop(u_id)
+        del u
+
+            
     def __init__(self, id:int, name:str, ws:WebSocket) -> None:
         self.id:int = id
         self.name:str = name
@@ -21,80 +39,208 @@ class User:
         self.row:int = 0
         self.col:int = 0
         self.state:int = 0      # 0:로딩, 1:map, 2:contact
-        self.stage:int = None
+        self.stage:Stage = None
+
+    async def activate(self):
+        try:
+            # 연결승인
+            await self.ws.accept()
+
+            # 게임 init
+            ok = await send_0(self.ws)
+            if not ok:
+                raise Exception("game init error")
+            
+            # 유저 init
+            ok = await send_10(
+                self.ws,
+                {
+                    "id":self.id,
+                    "name":self.name
+                }
+            )
+            if not ok:
+                raise Exception("user init error")
+
+            # 미로 init
+            ok = await send_20(self.ws, Game.maze)
+            if not ok:
+                raise Exception("maze init error")
+
+            # 게임 시작
+            self.row, self.col = Game.find_starting() # 시작 좌표 배정
+            ok = await send_22(self.ws, self.row, self.col)
+            if not ok:
+                raise Exception("game start error")
+            
+            # 지도에 유저 배치
+            await Game.deploy_obj(self.row, self.col, self)
+            self.state = 1
+            print(f"{self.id}:{self.name} 의 게임이 시작됨")
+            
+            # 게임 중 msg 수신
+            while True:
+                msg = await self.ws.receive_bytes()
+                await self.cmd(msg[0], msg[1:])
+
+        except Exception as e:
+            print(f"ERROR from {self.id}:{self.name}'s activate : ", e)
+
+        finally:
+            print(f"{self.id}:{self.name} 가 {self.state} 상태에서 종료됨")
+            if self.state == 0:
+                print()
+            elif self.state == 1:
+                Game.map[ np.where(Game.map==self.id) ] = 0
+                Game.near.discard( self.id )
+            elif self.state == 2:
+                # 스테이지 폐쇄 절차
+                if self.stage:
+                    await Stage.disconnect(self)
+                
+                print()
+            try:
+                await self.ws.close()
+            except Exception as e:
+                print(f"{self.id}:{self.name} 의 웹소켓은 이미 닫힘 : ", e)
+
+
+    async def cmd(self, cmd:int, data):
+        # 0~9 게임 #################################################
+        if cmd == 0:
+            return
+        # 10~19 유저 #################################################
+        elif cmd == 13: # 유저 갱신
+            if self.state == 1:
+                nr, nc = struct.unpack(">HH", data)
+                await Game.deploy_obj(nr, nc, self)
+                if self.id not in Game.near:
+                    Game.check_near(self)
+
+        # 20~29 미로 #################################################
+        elif cmd == 20:
+            return
+        # 30~39 컨택 #################################################
+        elif cmd == 30:
+            return
+        elif cmd == 33:
+            if self.state == 2:
+                choice = struct.unpack(">B", data)[0]
+                result = await self.stage.match(self.id, choice)
+
+
+
 
 
 class Stage:
     instances:dict[int:"Stage"] = {}
 
     @classmethod
-    def get_id(cls):
-        used = [ i.id for i in cls.instances ]
-        for i in range( len(cls.instances)+1 ):
-            if i not in used:
-                return i
+    def create_stage(cls, row:int, col:int, host:User, guest:User):
+        used_id = [ k for k in cls.instances.keys() ]
+        for i in range( 1, len(cls.instances)+2 ):
+            if i not in used_id:
+                stage = cls(i, row, col, host, guest)
+                host.stage, guest.stage = stage, stage
+                cls.instances[i] = stage
+                print(f"스테이지 {i} 가 생성됨")
 
-    def __init__(self, row:int, col:int, u1:int, u2:int) -> None:
-        _id = Stage.get_id()
-        self.id:int = _id
+
+    @classmethod
+    def delete_stage(cls, stage_id:int):
+        try:
+            stage = cls.instances.pop(stage_id)
+
+            # 모든 유저의 미로 갱신
+            asyncio.create_task( Game.change_maze( 0, stage.row, stage.col ) )
+
+            # 참여 유저들 해제
+            for u in stage.users.values():
+                u.stage = None
+
+            del stage
+
+            print(f"스테이지 {stage_id} 제거됨. 현재 스테이지 : {cls.instances.keys()}")
+        except:
+            print(f"스테이지 {stage_id} 제거 실패")
+
+
+    @classmethod
+    async def disconnect(cls, u:User):
+        stage = u.stage
+        stage.users.pop(u.id)
+
+        # 남은 놈 승리
+        for w in stage.users.values():
+            await send_33(w.ws,2)
+
+
+    
+    def __init__(self, id:int, row:int, col:int, host:User, guest:User):
+        self.id:int = id
         self.row:int = row
         self.col:int = col
-        self.users:dict
-        self.u1:int = u1
-        self.u2:int = u2
-        self.choices:dict[int,int] = {}
-        self.winner:User = None
-        Stage.instances[_id] = self
+        self.users:dict[int,User] = {host.id:host, guest.id:guest}
+        self.choice:int = None
     
     async def match(self, u_id, choice):
-        print(f"현재 선택 제출 : ", self.choices)
-        if len(self.choices) == 1: # 전원 결과를 제출 했으면
-            oc = self.choices.popitem()
-            print(">>>>",oc)
-            if choice == oc[1]:
-                await send_33(Game.users[u_id].ws, 1)
-                await send_33(Game.users[oc[0]].ws, 1)
-                return False
-            else:
-                if choice==1:
-                    if oc[1] == 2:
-                        await send_33(Game.users[u_id].ws, 2)
-                        await send_33(Game.users[oc[0]].ws, 0)
-                    else:
-                        await send_33(Game.users[u_id].ws, 0)
-                        await send_33(Game.users[oc[0]].ws, 2)
-                elif choice==2:
-                    if oc[1] == 1:
-                        await send_33(Game.users[u_id].ws, 0)
-                        await send_33(Game.users[oc[0]].ws, 2)
-                    else:
-                        await send_33(Game.users[u_id].ws, 2)
-                        await send_33(Game.users[oc[0]].ws, 0)
-                else:
-                    if oc[1] == 1:
-                        await send_33(Game.users[u_id].ws, 2)
-                        await send_33(Game.users[oc[0]].ws, 0)
-                    else:
-                        await send_33(Game.users[u_id].ws, 0)
-                        await send_33(Game.users[oc[0]].ws, 2)
-                return True
-                
-                
+        print(f"{u_id} 가 {choice} 를 제출함")
+        winner = None
+        loser = None
+        
+        # 첫 제출자면
+        if self.choice is None:
+            print("첫 제출자")
+            self.choice = choice
+            return
+        
+        # 전원 제출이면
+        print("두번째 제출자")
+        u = self.users[u_id]
+        for k, v in self.users.items():
+            if k != u_id:
+                o = v
+        o_choice = self.choice
+
+        # 비겼으면
+        if choice == o_choice:
+            await send_33(u.ws, 1)
+            await send_33(o.ws, 1)
+            self.choice = None
+            return
+        
         else:
-            self.choices[u_id] = choice
+            if choice==1:
+                if o_choice == 2:
+                    winner, loser = u,o
+                else:
+                    winner, loser = o,u
+                
+            elif choice==2:
+                if o_choice == 1:
+                    winner, loser = o,u
+                else:
+                    winner, loser = u,o
+                
+            else:
+                if o_choice == 1:
+                    winner, loser = u,o
+                else:
+                    winner, loser = o,u
 
+            # 클라이언트에 승패 전송
+            await send_33(winner.ws, 2)
+            await send_33(loser.ws, 0)
 
+            # 서버에서 매치 뒷처리
+            Stage.delete_stage(self.id)
+            await Game.deploy_obj(winner.row, winner.col, winner)
+            winner.state = 1
+            return
 
-    async def start(self):
-        try:
-            await send_32( Game.users[self.u1].ws )
-            await send_32( Game.users[self.u2].ws )
-        except Exception as e:
-            print("ERROR from start : ", e)
 
 
 class Game:
-    users:dict[int:User] = {}
     size_r:int = 0
     size_c:int = 0
     max_u:int = 0
@@ -117,175 +263,116 @@ class Game:
         cls.map = np.full( (size_r, size_c), 0, dtype=np.uint8 )
         asyncio.create_task( cls.update_near() )
 
-
+    
     @classmethod
-    def add_user(cls, ws:WebSocket):
-        used = [ k for k in cls.users.keys() ]
-        for i in range(1, cls.max_u):
-            if not i in used:
-                u = User(i, ws.cookies.get("game_token"), ws)
-                cls.users[i] = u
-                return u
-        return False
+    def connect(cls, ws:WebSocket):
+        # 맥스 유저 체크
+        print(f"현재 접속중인 유저들 : {User.instances.keys()}")
+
+        if len(User.instances) > 99:
+            return False
+        
+        # 유저 만들기
+        u = User.create_user(
+            name=ws.cookies.get("game_token"),
+            ws= ws
+        )
+        return u
     
 
     @classmethod
     async def update_near(cls):
-        print("update_near 시작됨")
         while True:
             await cls.flag_near.wait()
             await asyncio.sleep(0.1)
             for id in list(cls.near):
-                u = cls.users[id]
-                base_r, base_c = u.row-cls.near_r, u.col-cls.near_r
-                sm = cls.map[u.row-cls.near_r:u.row+cls.near_r+1, u.col-cls.near_r:u.col+cls.near_r+1]
-                rs, cs = np.nonzero(sm)
-                vs = sm[rs, cs]
+                u = User.instances[id]
+                data = cls.check_near(u)
+                send_14( u.ws, data[0], data[1], data[2], data[3], data[4] )
 
-                # print(f"{u.id} : {sm}")
-                if rs.size > 1:
-                    # print(f"{u.id} 에 근접있음")
-                    cls.near.update(vs)
-                    send_23(u.ws, vs, rs, cs, base_r, base_c)
-                    
-                else:
-                    # print(f"{u.id} 에 근접없음")
-                    send_23(u.ws, vs, rs, cs, base_r, base_c)
-                    cls.near.discard(id)
-                    print(f"{id} 가 update_near 에서 벗어남!")
-                    if len(cls.near) == 0:
-                        cls.flag_near.clear()
-                        print("near가 비었음. 플래그 내림")
- 
 
     @classmethod
-    async def play(cls, u:User):
-        try:
-            # 연결승인
-            await u.ws.accept()
+    def check_near(cls, u:User):
+        base_r, base_c = u.row-cls.near_r, u.col-cls.near_r
+        sm = cls.map[base_r:u.row+cls.near_r+1, base_c:u.col+cls.near_r+1]
+        rs, cs = np.nonzero(sm)
+        vs = sm[rs, cs]
+        if rs.size > 1:
+            # 근접리스트 등록
+            cls.near.update(vs)
+            cls.flag_near.set()
+        else:
+            # 근접리스트에서 제거
+            cls.near.discard(u.id)
+            # print(f"{u.id} 가 update_near 에서 벗어남!")
+            if len(cls.near) == 0:
+                cls.flag_near.clear()
+                # print("near가 비었음. 플래그 내림")
 
-            # 시스템 init
-            ok = await send_0(u.ws)
-            if not ok:
-                raise Exception("init error")
+        return vs, rs, cs, base_r, base_c
+        # # 클라이언트 ui 표시
+        # send_14(u.ws, vs, rs, cs, base_r, base_c)
+        
+
+    @classmethod
+    async def deploy_obj(cls, nr:int, nc:int, u:User):
+        target_id = cls.map[nr, nc]
+        if target_id == 0: # 해당 위치가 비었으면
+            cls.map[u.row, u.col] = 0
+            cls.map[nr, nc] = u.id
+            u.row, u.col = nr, nc
+            cls.check_near(u)
+            # print(f"{u.id}:{u.name} 이 {u.row},{u.col} 에 배치됨")
             
-            # 유저 데이터 전달
-            ok = await send_10(u.ws, {
-                "id":u.id, "name":u.name
-            })
-            if not ok:
-                raise Exception("send User error")
-
-
-            # 미로보내기
-            ok = await send_20(u.ws, cls.maze)
-            if not ok:
-                raise Exception("send Maze error")
-
-            # 게임 시작 신호
-            u.row, u.col = cls.find_starting() # 시작 좌표 배정
-            ok = await send_22(u.ws, u.row, u.col)
-            if not ok:
-                raise Exception("send start error")
+        else: # 해당 위치에 선객이 있으면
+            print(f"{u.row},{u.col} 에 션객이 있어서 {u.id}:{u.name} 가 contact")
+            await cls.contact(nr, nc, User.instances[target_id], u)
             
-            # 유저를 맵에 배치
-            u.state = 1
-            cls.map[u.row, u.col] = u.id
 
-            while True:
-                resp = await u.ws.receive_bytes()
-                cmd = resp[0]
-                if cmd == 1:
-                    if u.state == 1:
-                        nr, nc = struct.unpack(">HH", resp[1:])
-                        if cls.map[nr,nc] == 0:
-                            cls.map[u.row, u.col] = 0
-                            u.row, u.col = nr, nc
-                            cls.map[nr,nc] = u.id
-                            print(f"{u.id} : {nr}, {nc}, {cls.near}")
+    @classmethod
+    async def contact(cls, row:int, col:int, host:User, guest:User):
+        # 스테이지 중 이동요청 차단
+        host.state, guest.state = 2, 2
+        ok = await send_30(row, col, host, guest)
+        if not ok:
+            print("스테이지 구성 실패")
+            send_1(host.ws)
+            send_1(guest.ws)
 
-                            # 업데이트 리스트 아니면 주변확인
-                            if u.id not in cls.near:
-                                sm = cls.map[u.row-cls.near_r:u.row+cls.near_r+1, u.col-cls.near_r:u.col+cls.near_r+1]
-                                rs, cs = np.nonzero(sm)
-                                if rs.size > 1:
-                                    vs = sm[rs, cs]
-                                    cls.near.update(vs)
-                                    if not cls.flag_near.is_set():
-                                        cls.flag_near.set()
-                        else:
-                            print("겹침 !!")
-                            o_id = cls.map[nr, nc]
-                            o:User = cls.users[ o_id ]
+        # 지도에서 두 유저 지우기( 혹시 뭔가 씹혔을 수 있으니 찾아서 지운다. )
+        cls.map[ np.where(cls.map==host.id) ] = 0
+        cls.map[ np.where(cls.map==guest.id) ] = 0
 
-                            # 이동 요청 씹기
-                            u.state, o.state = 2, 2
+        # 근접리스트에서 지우기
+        cls.near.discard(host.id)
+        cls.near.discard(guest.id)
 
-                            # 두 유저에게 contact init
-                            ok = await send_30(nr, nc, u, o)
-                            if not ok:
-                                return
+        # 두 유저의 위치정보를 Stage 로 변경
+        host.row, guest.row = row, row
+        host.col, guest.col = col, col
 
-                            # 지도에서 두 유저 지우기
-                            sm = cls.map[nr-cls.near_r:nr+cls.near_r, nc-cls.near_r:nc+cls.near_r]
-                            op_r, op_c = np.where( (sm==o.id) )
-                            up_r, up_c = np.where( (sm==u.id) )
-                            # print(">>>>>>>>>>>>>>>>>>>>>>>>>op : ", op_r, op_c)
-                            # print(">>>>>>>>>>>>>>>>>>>>>>>>>up : ", up_r, up_c)
-                            cls.map[op_r, op_c] = 0
-                            cls.map[up_r, up_c] = 0
+        # 모든 유저의 미로 갱신
+        asyncio.create_task( cls.change_maze( 8, row, col ) )
 
-                            # 근접 업데이트에서 지우기
-                            cls.near.discard(u.id); print(f"{u.id} 가 near를 벗어남");
-                            cls.near.discard(o.id); print(f"{o.id} 가 near를 벗어남");
-
-                            # 두 유저의 위치정보를 contact 지점으로
-                            o.row, u.row = nr, nr
-                            o.col, u.col = nc, nc
-
-                            # 모든 유저에게 maze변화 지시
-                            asyncio.create_task( cls.change_maze( 8, nr, nc ) )
-
-                            # 두 유저를 stage로 보내기
-                            stage = Stage(nr, nc, u.id, o.id)
-                            u.stage = stage.id
-                            o.stage = stage.id
-                            asyncio.create_task( stage.start() )
-
-                elif cmd == 2:
-                    if u.state == 2:
-                        choice = struct.unpack(">B", resp[1:])[0]
-                        print(f"{u.id}의 선택은 {choice} 받음")
-                        end = await Stage.instances[u.stage].match( u.id, choice )
-                        if end:
-                            try:
-                                Stage.instances.pop(u.stage)
-                                print("스테이지 제거됨 : ",Stage.instances)
-                            except Exception as e:
-                                print("ERROR from cmd 2 : ", e)
+        # 스테이지 시작
+        Stage.create_stage(row, col, host, guest)
+        await send_32(host.ws)
+        await send_32(guest.ws)
 
 
-        except Exception as e:
-            print("ERROR from play : ", e)
-
-        finally:
-            try:
-                cls.map[u.row, u.col] = 0
-                cls.near.discard(u.id)
-                u = cls.users.pop(u.id)
-                await u.ws.close()
-            except Exception as e:
-                print(e)
-    
-
+    ########################################################################
     @classmethod
     async def change_maze(cls, val:int, row:int, col:int):
+        print("미로 갱신 시작")
         # 미로 갱신
-        cls.maze[row, col] |= (val<<4)
+        cls.maze[row, col] = (cls.maze[row, col] & 0x0F) | (val << 4)
+
 
         # 모든 유저의 미로에 contact 지점 표시
-        for u in cls.users.values():
-            send_24(u.ws, val, row, col)
+        for u in User.instances.values():
+            send_23(u.ws, val, row, col)
+
+        print("미로 갱신 완료")
         return
     
 
@@ -301,4 +388,24 @@ class Game:
             if rs.size == 0:
                 break
         return r, c
+    
+
+    @classmethod
+    async def monitoring(cls, ws:WebSocket):
+        try:
+            while True:
+                await asyncio.sleep(1)
+                # print("맵 전송")
+                ok = await send_20(ws, cls.map)
+                if not ok:
+                    raise Exception("모니터링용 지도 전송 실패")
+        except Exception as e:
+            print("ERROR from monitoring : ", e)
+        finally:
+            try:
+                await ws.close()
+            except Exception as e:
+                print("모니터링 소켓 종료 에러")
+
+
 

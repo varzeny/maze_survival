@@ -25,9 +25,10 @@
 
             <div class="control">
                 <div class="state">
-                    NAME : {{ name }}
+                    ID : <span id="id-u"></span><br>
+                    NAME : {{ name }}<br>
                     HP : <span id="hp">0</span><br>
-                    MP : <span id="mp">0</span>
+                    MP : <span id="mp">0</span><br>
                 </div>
                 <div class="consol">
                     consol
@@ -63,13 +64,19 @@
             </div>
         </section>
 
-        <section class="win">
-            WIN !
-        </section>
+        <div class="modal" id="win">
+            <div class="modal-content">
+                WIN
+            </div>
+        </div>
 
-        <section class="lose">
-            Lose !
-        </section>
+        <div class="modal" id="lose">
+            <div class="modal-content">
+                LOSE
+            </div>
+        </div>
+
+
     </main>
 </body>
 </html>
