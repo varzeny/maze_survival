@@ -137,6 +137,7 @@ class Stage:
 
     @classmethod
     def create_stage(cls, row:int, col:int, host:User, guest:User):
+        # 스테이지 생성
         used_id = [ k for k in cls.instances.keys() ]
         for i in range( 1, len(cls.instances)+2 ):
             if i not in used_id:
@@ -144,6 +145,10 @@ class Stage:
                 host.stage, guest.stage = stage, stage
                 cls.instances[i] = stage
                 print(f"스테이지 {i} 가 생성됨")
+
+        # stage init
+
+
 
 
     @classmethod
@@ -234,8 +239,8 @@ class Stage:
 
             # 서버에서 매치 뒷처리
             Stage.delete_stage(self.id)
-            await Game.deploy_obj(winner.row, winner.col, winner)
             winner.state = 1
+            await Game.deploy_obj(winner.row, winner.col, winner)
             return
 
 
@@ -333,6 +338,7 @@ class Game:
     async def contact(cls, row:int, col:int, host:User, guest:User):
         # 스테이지 중 이동요청 차단
         host.state, guest.state = 2, 2
+
         ok = await send_30(row, col, host, guest)
         if not ok:
             print("스테이지 구성 실패")

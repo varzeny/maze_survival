@@ -36,6 +36,14 @@ async def send_10(ws:WebSocket, dic:dict)->bool:  # 유저
         print("ERROR from send_10 : ", e)
         return False
     
+async def send_13(ws:WebSocket, row:int, col:int):
+    try:
+        await ws.send_bytes( struct.pack(">BHH", 13, row, col) )
+        return True
+    except Exception as e:
+        print("ERROR from send_13 : ", e)
+        return False
+    
 def send_14(ws:WebSocket, vs:np.ndarray, rs:np.ndarray, cs:np.ndarray, base_r:int, base_c:int)->bool:  # 갱신
     try:
         data = b""

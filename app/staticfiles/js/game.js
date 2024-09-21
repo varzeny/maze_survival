@@ -83,6 +83,10 @@ const SERVER = {
         11:(respData)=>{ // user deinit
     
         },
+        13:(respData)=>{ // 유저 배치
+            GAME.USER.row = respData.getUint16(1);
+            GAME.USER.col = respData.getUint16(3);
+        },
         14:(respData)=>{ // 근접정보
             if(GAME.USER.state==1){
                 GAME.DRAW.eraseObjAll();
@@ -149,19 +153,24 @@ const SERVER = {
     
         // 30~39 contact //////////////////////////////////////////////////////////
         30:(respData)=>{ // contact init
+            if(GAME.USER.state == 1){
+                GAME.USER.row = respData.getUint16(1);
+                GAME.USER.col = respData.getUint16(3);
+                console.log("contact : ", GAME.USER.row, GAME.USER.col);   
+
+                // 화면전환
+                PAGE.TAB.changeTab("loading");
+                setTimeout( ()=>{ PAGE.TAB.changeTab("contact") }, 2000 );
+        
+                // 맵 정리
+                GAME.DRAW.eraseObjAll();
+        
+            }else{ // 매복당함
+                console.log("매복당함!");
+
+            }
+            // 공통작업 ////////////////////////////////////////////////
             GAME.USER.state = 2;
-            GAME.USER.row = respData.getUint16(1);
-            GAME.USER.col = respData.getUint16(3);
-            console.log("contact : ", GAME.USER.row, GAME.USER.col);   
-    
-            // 화면전환
-            PAGE.TAB.changeTab("loading");
-            setTimeout( ()=>{ PAGE.TAB.changeTab("contact") }, 1000 );
-    
-            // 맵 정리
-            GAME.DRAW.eraseObjAll();
-    
-            // 상대 정보 
             const jsonStr = new TextDecoder("utf-8").decode( new Uint8Array(respData.buffer).slice(5) );
             const o = JSON.parse( jsonStr );
             console.log(o);
@@ -171,7 +180,6 @@ const SERVER = {
             document.getElementById("name-u").innerHTML = GAME.USER.name;
             document.getElementById("name-o").innerHTML = GAME.OPPO.name;
             GAME.CONTACT.announce.innerHTML = "Ready~";
-    
         },
         31:(respData)=>{ // contact deinit
     
@@ -183,18 +191,23 @@ const SERVER = {
         33:(respData)=>{ // 턴 종료 & 결과
             const result = respData.getUint8(1);
             console.log(">>>>>>>결과<<<<<<<<", result);
-            if(result==0){
+            if(result==0){ // 패배
                 PAGE.MODAL.open("lose");
                 setTimeout( ()=>{window.location.href="/"}, 2000 );
-            }else if(result==1){
+            }else if(result==1){ // 무승부
                 GAME.CONTACT.announce.innerHTML="DRAW";
                 GAME.CONTACT.turnStart();
-            }else{
-                setTimeout( ()=>{
-                    PAGE.TAB.changeTab("maze");
-                    GAME.USER.state = 1;
-                    PAGE.MODAL.close();
+            }else{ // 승리
+                GAME.USER.schedule = setTimeout( ()=>{
+                    if(GAME.USER.state==0){ // 출구에 매복 없으면
+                        PAGE.TAB.changeTab("maze");
+                        GAME.USER.state = 1;
+                        PAGE.MODAL.close();
+                    }else{ // 출구에 매복 있으면
+                        PAGE.MODAL.close();
+                    }
                 }, 2000 );
+                GAME.USER.state = 0 // 대기상태
                 PAGE.MODAL.open("win");
 
                 // 맵 정리
@@ -257,7 +270,8 @@ const GAME = {
         name:null,
         row:null,
         col:null,
-        state:0     // 0:로딩, 1:map, 2:contact
+        state:0,     // 0:로딩, 1:map, 2:contact
+        schedule:null
     },
     OPPO:{
         name:null
@@ -271,6 +285,10 @@ const GAME = {
     
         objCanvas:null,
         objCtx:null,
+
+        imgs:{
+            wall:new Image()
+        },
     
         init:function(){
             // context 읽기
@@ -288,6 +306,9 @@ const GAME = {
             this.objCanvas.width = CONFIG.cols * this.cellSize;
             this.objCanvas.height = CONFIG.rows * this.cellSize;
             this.objCtx = this.objCanvas.getContext("2d");
+
+            // 이미지 세팅
+            this.imgs.wall.src = "static/image/obj/wall.jpg";
         },
         drawObjs:function(v, r, c){
             const x = c * this.cellSize;
@@ -319,34 +340,53 @@ const GAME = {
             const x = c * this.cellSize;
             const y = r * this.cellSize;
         
-            this.mazeCtx.fillStyle = "white";
-            this.mazeCtx.fillRect(x, y, this.cellSize, this.cellSize);
+            // this.mazeCtx.fillStyle = "rgb(43,26,31)";
+            // this.mazeCtx.fillRect(x, y, this.cellSize, this.cellSize);
         
-            this.mazeCtx.strokeStyle = "black";
-            this.mazeCtx.lineWidth = 2;
-        
-            // 외곽 패딩 처리
-            if ((GAME.MAZE[r][c]&15) == 15){
+
+            // 벽
+            // this.mazeCtx.strokeStyle = "black";
+            // this.mazeCtx.lineWidth = 8;
+
+            const cellVal = GAME.MAZE[r][c] & 15
+
+            if(cellVal == 15){
                 this.mazeCtx.fillStyle = "black";
                 this.mazeCtx.fillRect(x, y, this.cellSize, this.cellSize);
                 return; // 패딩 처리된 셀은 벽이나 지형지물을 그리지 않음
+            }else{
+                if(cellVal & 1){
+                    this.mazeCtx.drawImage(this.imgs.wall, x, y, this.cellSize, this.cellSize/10);
+                    // this.mazeCtx.beginPath();
+                    // this.mazeCtx.moveTo(x, y);
+                    // this.mazeCtx.lineTo(x + this.cellSize, y);
+                    // this.mazeCtx.stroke();
+                }
+                if(cellVal & 2){
+                    this.mazeCtx.drawImage(this.imgs.wall, x+this.cellSize, y, this.cellSize/10, this.cellSize);
+                    // this.mazeCtx.beginPath();
+                    // this.mazeCtx.moveTo(x + this.cellSize, y);
+                    // this.mazeCtx.lineTo(x + this.cellSize, y + this.cellSize);
+                    // this.mazeCtx.stroke();
+                }
+                if(cellVal & 4){
+                    this.mazeCtx.drawImage(this.imgs.wall, x, y+this.cellSize, this.cellSize, this.cellSize/10);
+
+                    // this.mazeCtx.beginPath();
+                    // this.mazeCtx.moveTo(x, y + this.cellSize);
+                    // this.mazeCtx.lineTo(x + this.cellSize, y + this.cellSize);
+                    // this.mazeCtx.stroke();
+                }
+                if(cellVal & 8){
+                    this.mazeCtx.drawImage(this.imgs.wall, x, y, this.cellSize/10, this.cellSize);
+
+                    // this.mazeCtx.beginPath();
+                    // this.mazeCtx.moveTo(x, y);
+                    // this.mazeCtx.lineTo(x, y+this.cellSize);
+                    // this.mazeCtx.stroke();
+                }
             }
-        
-            // 오른쪽 벽 (비트 2)
-            if (GAME.MAZE[r][c] & 2) {
-                this.mazeCtx.beginPath();
-                this.mazeCtx.moveTo(x + this.cellSize, y);
-                this.mazeCtx.lineTo(x + this.cellSize, y + this.cellSize);
-                this.mazeCtx.stroke();
-            }
-        
-            // 아래쪽 벽 (비트 4)
-            if (GAME.MAZE[r][c] & 4) {
-                this.mazeCtx.beginPath();
-                this.mazeCtx.moveTo(x, y + this.cellSize);
-                this.mazeCtx.lineTo(x + this.cellSize, y + this.cellSize);
-                this.mazeCtx.stroke();
-            }
+
         
             // 지형지물
             const mazeObj = GAME.MAZE[r][c]>>4
