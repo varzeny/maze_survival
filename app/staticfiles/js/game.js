@@ -287,13 +287,16 @@ const GAME = {
         objCtx:null,
 
         imgs:{
-            wall:new Image()
+            wall:new Image(),
+            user: new Image(),
+            enemy: new Image(),
+            contact: new Image()
         },
     
         init:function(){
             // context 읽기
             this.remSize = parseFloat(getComputedStyle(document.documentElement).fontSize);
-            this.cellSize = this.remSize * 2
+            this.cellSize = this.remSize * 3
     
             // Maze 캔버스 세팅
             this.mazeCanvas = document.getElementById("maze-canvas");
@@ -309,6 +312,9 @@ const GAME = {
 
             // 이미지 세팅
             this.imgs.wall.src = "static/image/obj/wall.jpg";
+            this.imgs.user.src = "static/image/obj/user.png";
+            this.imgs.enemy.src = "static/image/obj/enemy.png";
+            this.imgs.contact.src = "static/image/obj/contact.png";
         },
         drawObjs:function(v, r, c){
             const x = c * this.cellSize;
@@ -316,17 +322,17 @@ const GAME = {
         
             // 캐릭터 그리기
             if(0<v && v<101){   // 유저
-                if(v==GAME.USER.id){ this.objCtx.fillStyle = "blue"; }
-                else{ this.objCtx.fillStyle = "red"; }
+                if(v==GAME.USER.id){
+                    this.objCtx.drawImage(this.imgs.user, x+(this.cellSize/5), y+(this.cellSize/5), this.cellSize*0.8, this.cellSize*0.8);
+                }
+                else{
+                    this.objCtx.drawImage(this.imgs.enemy, x+(this.cellSize/5), y+(this.cellSize/5), this.cellSize*0.8, this.cellSize*0.8);
+                }
             }else if(101<v && v<201){
                 console.log();
             }else{
                 console.log();
             }
-        
-            this.objCtx.beginPath();
-            this.objCtx.arc(x + this.cellSize / 2, y + this.cellSize / 2, this.cellSize / 3, 0, Math.PI * 2);
-            this.objCtx.fill();
         },
         eraseObj:function(r, c){
             const x = c * this.cellSize;
@@ -339,14 +345,6 @@ const GAME = {
         drawCell:function(r, c){
             const x = c * this.cellSize;
             const y = r * this.cellSize;
-        
-            // this.mazeCtx.fillStyle = "rgb(43,26,31)";
-            // this.mazeCtx.fillRect(x, y, this.cellSize, this.cellSize);
-        
-
-            // 벽
-            // this.mazeCtx.strokeStyle = "black";
-            // this.mazeCtx.lineWidth = 8;
 
             const cellVal = GAME.MAZE[r][c] & 15
 
@@ -356,34 +354,16 @@ const GAME = {
                 return; // 패딩 처리된 셀은 벽이나 지형지물을 그리지 않음
             }else{
                 if(cellVal & 1){
-                    this.mazeCtx.drawImage(this.imgs.wall, x, y, this.cellSize, this.cellSize/10);
-                    // this.mazeCtx.beginPath();
-                    // this.mazeCtx.moveTo(x, y);
-                    // this.mazeCtx.lineTo(x + this.cellSize, y);
-                    // this.mazeCtx.stroke();
+                    this.mazeCtx.drawImage(this.imgs.wall, x, y, this.cellSize, this.cellSize/5);
                 }
                 if(cellVal & 2){
-                    this.mazeCtx.drawImage(this.imgs.wall, x+this.cellSize, y, this.cellSize/10, this.cellSize);
-                    // this.mazeCtx.beginPath();
-                    // this.mazeCtx.moveTo(x + this.cellSize, y);
-                    // this.mazeCtx.lineTo(x + this.cellSize, y + this.cellSize);
-                    // this.mazeCtx.stroke();
+                    this.mazeCtx.drawImage(this.imgs.wall, x+this.cellSize, y, this.cellSize/5, this.cellSize);
                 }
                 if(cellVal & 4){
-                    this.mazeCtx.drawImage(this.imgs.wall, x, y+this.cellSize, this.cellSize, this.cellSize/10);
-
-                    // this.mazeCtx.beginPath();
-                    // this.mazeCtx.moveTo(x, y + this.cellSize);
-                    // this.mazeCtx.lineTo(x + this.cellSize, y + this.cellSize);
-                    // this.mazeCtx.stroke();
+                    this.mazeCtx.drawImage(this.imgs.wall, x, y+this.cellSize, this.cellSize, this.cellSize/5);
                 }
                 if(cellVal & 8){
-                    this.mazeCtx.drawImage(this.imgs.wall, x, y, this.cellSize/10, this.cellSize);
-
-                    // this.mazeCtx.beginPath();
-                    // this.mazeCtx.moveTo(x, y);
-                    // this.mazeCtx.lineTo(x, y+this.cellSize);
-                    // this.mazeCtx.stroke();
+                    this.mazeCtx.drawImage(this.imgs.wall, x, y, this.cellSize/5, this.cellSize);
                 }
             }
 
@@ -426,17 +406,7 @@ const GAME = {
                     this.mazeCtx.fill();
                     break;
                 case 8: // contact (빨간 엑스)
-                    this.mazeCtx.strokeStyle = "red";
-                    this.mazeCtx.lineWidth = 3;
-                    this.mazeCtx.beginPath();
-                    this.mazeCtx.moveTo(x + this.cellSize / 4, y + this.cellSize / 4);
-                    this.mazeCtx.lineTo(x + 3 * this.cellSize / 4, y + 3 * this.cellSize / 4);
-                    this.mazeCtx.stroke();
-            
-                    this.mazeCtx.beginPath();
-                    this.mazeCtx.moveTo(x + 3 * this.cellSize / 4, y + this.cellSize / 4);
-                    this.mazeCtx.lineTo(x + this.cellSize / 4, y + 3 * this.cellSize / 4);
-                    this.mazeCtx.stroke();
+                    this.mazeCtx.drawImage(this.imgs.contact, x, y, this.cellSize, this.cellSize);
                     break;
                 default:
                     console.log("알 수 없는 지형지물");
@@ -554,8 +524,8 @@ const GAME = {
         },
         moveViewToCharacter:function(obj) {
             // 중앙에 위치할 캐릭터의 좌표 계산
-            const offsetX = (obj.col * GAME.DRAW.cellSize) - (5 * GAME.DRAW.cellSize);  // 화면의 중앙에 맞춰 이동
-            const offsetY = (obj.row * GAME.DRAW.cellSize) - (5 * GAME.DRAW.cellSize);
+            const offsetX = (obj.col * GAME.DRAW.cellSize) - (4 * GAME.DRAW.cellSize);  // 화면의 중앙에 맞춰 이동
+            const offsetY = (obj.row * GAME.DRAW.cellSize) - (4 * GAME.DRAW.cellSize);
         
             // 미로와 캐릭터의 위치 이동 (CSS transform 사용)
             GAME.DRAW.mazeCanvas.style.transform = `translate(${-offsetX}px, ${-offsetY}px)`;

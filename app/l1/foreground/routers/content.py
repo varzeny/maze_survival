@@ -4,7 +4,7 @@
 from fastapi.routing import APIRouter
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
-from fastapi.responses import Response, FileResponse
+from fastapi.responses import Response, FileResponse, RedirectResponse
 from fastapi.websockets import WebSocket
 import struct
 import asyncio
@@ -69,9 +69,9 @@ async def get_html_monnitor(req:Request):
 
 @router.post("/start")
 async def post_start(req:Request):
-    reqData = await req.json()
-    # print("reqData : ", reqData)    
-    resp = Response(status_code=200)
+    reqData = await req.form()
+
+    resp = RedirectResponse("/game", status_code=303)
     resp.set_cookie(
         key="game_token",
         value=reqData.get("name"),

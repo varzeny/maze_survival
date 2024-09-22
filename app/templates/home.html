@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset='utf-8'>
-    <title>WGW</title>
+    <title>Dungeon Survival</title>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
     <link rel='stylesheet' type='text/css' href="{{ url_for('static_files', path='css/reset.css') }}">
     <link rel='stylesheet' type='text/css' href="{{ url_for('static_files', path='css/thema.css') }}">
@@ -13,17 +13,16 @@
 
     <main>
 
-        <section class="start_form">
-            <div class="h">
-                <h1>WGW</h1>
-            </div>
-            <div class="i">
-                Name : <input id="input-name" type="text">
-            </div>
-            <div class="f">
-                <button id="btn-start">START</button>
-            </div>
-        </section>
+        <div class="panel" id="start">
+
+            <form class="start-form" action="/start", method="post">
+                <label for="input-name">Name</label>
+                <input type="text" id="input-name" name="name" required>
+                <button>Game Start !</button>
+            </form>
+
+        </div>
+
     </main>
 </body>
 </html>
