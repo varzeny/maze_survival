@@ -30,3 +30,14 @@ async def get_html_root(req:Request):
 @router.get("/favicon.ico")
 async def get_favicon():
     return FileResponse(path="app/staticfiles/image/icon/ds.ico")
+
+
+
+@router.get("/test")
+async def get_html_test(req:Request):
+    resp = template.TemplateResponse(
+        request=req,
+        name="test.html",
+        context={}
+    )
+    return resp

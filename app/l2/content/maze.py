@@ -30,14 +30,14 @@ class Manager:
 
         # obj 배치
         ## 위계단
-        cls.random_position(maze, 0, rows, 0, cols, 1)
+        # cls.random_position(maze, 0, rows, 0, cols, 1)
 
-        ## 아래계단
-        cls.random_position(maze, 0, rows, 0, cols, 2)
+        # ## 아래계단
+        # cls.random_position(maze, 0, rows, 0, cols, 2)
 
         ## 상자
-        for i in range( int(rows*cols/100) ):
-            cls.random_position(maze,0,rows,0,cols, 3)
+        # for i in range( int(rows*cols/100) ):
+        #     cls.random_position(maze,0,rows,0,cols, 3)
             
 
         # 패딩(검색연산 줄이기위한)
@@ -50,14 +50,14 @@ class Manager:
         return result
     
 
-    @classmethod
-    def random_position(cls, map, sr, er, sc, ec, v):
-        while True:
-            r = np.random.randint(sr, er)
-            c = np.random.randint(sc, ec)
-            if (map[r, c] >> 4) == 0:
-                map[r,c] |= (v<<4)
-                break
+    # @classmethod
+    # def random_position(cls, map, sr, er, sc, ec, v):
+    #     while True:
+    #         r = np.random.randint(sr, er)
+    #         c = np.random.randint(sc, ec)
+    #         if (map[r, c] >> 4) == 0:
+    #             map[r,c] |= (v<<4)
+    #             break
 
 
 

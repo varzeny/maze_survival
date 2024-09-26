@@ -15,10 +15,10 @@
 
     </aside>
     <main>
-
         <section class="maze">
             <div class="screen">
                 <div class="container-canvas">
+                    <div id="mist"></div>
                     <canvas id="maze-canvas"></canvas>
                     <canvas id="obj-canvas"></canvas>
                 </div>
@@ -41,18 +41,21 @@
         <section class="contact">
             <div class="panel-screen">
                 <div class="area-u">
+                    <img class="portrait" id="port-u">
                     NAME : <span id="name-u"></span>
                 </div>
                 <div class="area-o">
+                    <img class="portrait" id="port-o">
                     NAME : <span id="name-o"></span>
                 </div>
             </div>
+            <div class="panel-announce">
+                <span id="announce"></span>
+            </div>
             <div class="panel-control">
-                <span id="announce"></span><hr>
-                <button id="r">R</button>
-                <button id="s">S</button>
-                <button id="p">P</button>
-
+                <button class="btn-rsp" id="r">R</button>
+                <button class="btn-rsp" id="s">S</button>
+                <button class="btn-rsp" id="p">P</button>
             </div>
         </section>
 

@@ -46,10 +46,15 @@ class User:
             # 연결승인
             await self.ws.accept()
 
-            # 게임 init
-            ok = await send_0(self.ws)
-            if not ok:
-                raise Exception("game init error")
+            # 게임 init 
+            # 다음 버전을 위한것, 현재 쓰이지 않음
+            # ok = await send_0(self.ws, {
+            #     "size_r":Game.size_r,
+            #     "size_c":Game.size_c,
+            #     "near_r":Game.near_r
+            # })
+            # if not ok:
+            #     raise Exception("game init error")
             
             # 유저 init
             ok = await send_10(
@@ -178,6 +183,9 @@ class Stage:
         # 남은 놈 승리
         for w in stage.users.values():
             await send_33(w.ws,2)
+            Stage.delete_stage(stage.id)
+            w.state = 1
+            await Game.deploy_obj(w.row, w.col, w)
 
 
     

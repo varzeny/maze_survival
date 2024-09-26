@@ -3,9 +3,14 @@
 document.addEventListener("DOMContentLoaded", init);
 
 const CONFIG = {
-    rows:100,
-    cols:100,
-    near_r:4
+    rows:null,
+    cols:null,
+    near_r:null,
+    init:function(rows, cols, near_r){
+        this.rows = rows;
+        this.cols = cols;
+        this.near_r = near_r
+    }
 }
 
 const SERVER = {
@@ -58,7 +63,13 @@ const SERVER = {
         // 0~9 시스템 //////////////////////////////////////////////////////////
         0:(respData)=>{ // 게임 init
             console.log("게임세팅 시작");
-            // 게임설정 받기
+            // const jsonStr = new TextDecoder("utf-8").decode( new Uint8Array(respData.buffer).slice(1) );
+            // const dic = JSON.parse( jsonStr );
+            // console.log(dic);
+            // CONFIG.rows = dic.size_r;
+            // CONFIG.cols = dic.size_c;
+            // CONFIG.near_r = dic.near_r;
+            // console.log(CONFIG);
         },
         1:(respData)=>{ // 게임 deinit
             try{
@@ -177,6 +188,8 @@ const SERVER = {
             GAME.OPPO.name = o.name
     
             // 화면에 표시
+            document.getElementById("port-u").src="static/image/obj/user.png";
+            document.getElementById("port-o").src="static/image/obj/enemy.png";
             document.getElementById("name-u").innerHTML = GAME.USER.name;
             document.getElementById("name-o").innerHTML = GAME.OPPO.name;
             GAME.CONTACT.announce.innerHTML = "Ready~";
@@ -374,36 +387,36 @@ const GAME = {
                 case 0: // 없음
                     break;
                 case 1: // 위층으로 (검은색 정삼각형)
-                    this.mazeCtx.fillStyle = "black";
-                    this.mazeCtx.beginPath();
-                    this.mazeCtx.moveTo(x + this.cellSize / 2, y);  // 꼭대기
-                    this.mazeCtx.lineTo(x + this.cellSize, y + this.cellSize);  // 오른쪽 아래
-                    this.mazeCtx.lineTo(x, y + this.cellSize);  // 왼쪽 아래
-                    this.mazeCtx.closePath();
-                    this.mazeCtx.fill();
+                    // this.mazeCtx.fillStyle = "black";
+                    // this.mazeCtx.beginPath();
+                    // this.mazeCtx.moveTo(x + this.cellSize / 2, y);  // 꼭대기
+                    // this.mazeCtx.lineTo(x + this.cellSize, y + this.cellSize);  // 오른쪽 아래
+                    // this.mazeCtx.lineTo(x, y + this.cellSize);  // 왼쪽 아래
+                    // this.mazeCtx.closePath();
+                    // this.mazeCtx.fill();
                     break;
                 case 2: // 아래층으로 (검은색 역삼각형)
-                    this.mazeCtx.fillStyle = "black";
-                    this.mazeCtx.beginPath();
-                    this.mazeCtx.moveTo(x, y);  // 왼쪽 위
-                    this.mazeCtx.lineTo(x + this.cellSize, y);  // 오른쪽 위
-                    this.mazeCtx.lineTo(x + this.cellSize / 2, y + this.cellSize);  // 아래쪽 중앙
-                    this.mazeCtx.closePath();
-                    this.mazeCtx.fill();
+                    // this.mazeCtx.fillStyle = "black";
+                    // this.mazeCtx.beginPath();
+                    // this.mazeCtx.moveTo(x, y);  // 왼쪽 위
+                    // this.mazeCtx.lineTo(x + this.cellSize, y);  // 오른쪽 위
+                    // this.mazeCtx.lineTo(x + this.cellSize / 2, y + this.cellSize);  // 아래쪽 중앙
+                    // this.mazeCtx.closePath();
+                    // this.mazeCtx.fill();
                     break;
                 case 3: // 상자 (갈색 네모)
-                    this.mazeCtx.fillStyle = "brown";
-                    this.mazeCtx.fillRect(x + this.cellSize / 4, y + this.cellSize / 4, this.cellSize / 2, this.cellSize / 2);
+                    // this.mazeCtx.fillStyle = "brown";
+                    // this.mazeCtx.fillRect(x + this.cellSize / 4, y + this.cellSize / 4, this.cellSize / 2, this.cellSize / 2);
                     break;
                 case 4: // 함정 (주황 마름모)
-                    this.mazeCtx.fillStyle = "orange";
-                    this.mazeCtx.beginPath();
-                    this.mazeCtx.moveTo(x + this.cellSize / 2, y);  // 위쪽 중앙
-                    this.mazeCtx.lineTo(x + this.cellSize, y + this.cellSize / 2);  // 오른쪽 중앙
-                    this.mazeCtx.lineTo(x + this.cellSize / 2, y + this.cellSize);  // 아래쪽 중앙
-                    this.mazeCtx.lineTo(x, y + this.cellSize / 2);  // 왼쪽 중앙
-                    this.mazeCtx.closePath();
-                    this.mazeCtx.fill();
+                    // this.mazeCtx.fillStyle = "orange";
+                    // this.mazeCtx.beginPath();
+                    // this.mazeCtx.moveTo(x + this.cellSize / 2, y);  // 위쪽 중앙
+                    // this.mazeCtx.lineTo(x + this.cellSize, y + this.cellSize / 2);  // 오른쪽 중앙
+                    // this.mazeCtx.lineTo(x + this.cellSize / 2, y + this.cellSize);  // 아래쪽 중앙
+                    // this.mazeCtx.lineTo(x, y + this.cellSize / 2);  // 왼쪽 중앙
+                    // this.mazeCtx.closePath();
+                    // this.mazeCtx.fill();
                     break;
                 case 8: // contact (빨간 엑스)
                     this.mazeCtx.drawImage(this.imgs.contact, x, y, this.cellSize, this.cellSize);
@@ -467,42 +480,39 @@ const GAME = {
                     switch (ev.key) {
                         case "w":
                             if(this.cooldown()){ break; }
-                            if (GAME.USER.row > CONFIG.near_r) {
-                                GAME.DRAW.eraseObj(GAME.USER.row, GAME.USER.col);
-                                GAME.USER.row--;
-                                GAME.DRAW.drawObjs(GAME.USER.id, GAME.USER.row, GAME.USER.col);
-                                this.move();
-                            }
+                            if(GAME.MAZE[GAME.USER.row][GAME.USER.col] & 1){ break; }
+                            GAME.DRAW.eraseObj(GAME.USER.row, GAME.USER.col);
+                            GAME.USER.row--;
+                            GAME.DRAW.drawObjs(GAME.USER.id, GAME.USER.row, GAME.USER.col);
+                            this.move();
+
                             break;
                 
                         case "a":
                             if(this.cooldown()){ break; }
-                            if (GAME.USER.col > CONFIG.near_r) {
-                                GAME.DRAW.eraseObj(GAME.USER.row, GAME.USER.col);
-                                GAME.USER.col--;
-                                GAME.DRAW.drawObjs(GAME.USER.id, GAME.USER.row, GAME.USER.col);
-                                this.move();
-                            }
+                            if(GAME.MAZE[GAME.USER.row][GAME.USER.col] & 8){ break; }
+                            GAME.DRAW.eraseObj(GAME.USER.row, GAME.USER.col);
+                            GAME.USER.col--;
+                            GAME.DRAW.drawObjs(GAME.USER.id, GAME.USER.row, GAME.USER.col);
+                            this.move();
                             break;
                 
                         case "s":
                             if(this.cooldown()){ break; }
-                            if (GAME.USER.row < CONFIG.rows-CONFIG.near_r-1) {
-                                GAME.DRAW.eraseObj(GAME.USER.row, GAME.USER.col);
-                                GAME.USER.row++;
-                                GAME.DRAW.drawObjs(GAME.USER.id, GAME.USER.row, GAME.USER.col);
-                                this.move();
-                            }
+                            if(GAME.MAZE[GAME.USER.row][GAME.USER.col] & 4){ break; }
+                            GAME.DRAW.eraseObj(GAME.USER.row, GAME.USER.col);
+                            GAME.USER.row++;
+                            GAME.DRAW.drawObjs(GAME.USER.id, GAME.USER.row, GAME.USER.col);
+                            this.move();
                             break;
                 
                         case "d":
                             if(this.cooldown()){ break; }
-                            if (GAME.USER.col < CONFIG.rows-CONFIG.near_r-1) {
-                                GAME.DRAW.eraseObj(GAME.USER.row, GAME.USER.col);
-                                GAME.USER.col++;
-                                GAME.DRAW.drawObjs(GAME.USER.id, GAME.USER.row, GAME.USER.col);
-                                this.move();
-                            }
+                            if(GAME.MAZE[GAME.USER.row][GAME.USER.col] & 2){ break; }
+                            GAME.DRAW.eraseObj(GAME.USER.row, GAME.USER.col);
+                            GAME.USER.col++;
+                            GAME.DRAW.drawObjs(GAME.USER.id, GAME.USER.row, GAME.USER.col);
+                            this.move();
                             break;
                     }
                     console.log(GAME.USER.row, GAME.USER.col)
@@ -545,6 +555,9 @@ const GAME = {
 
 
 async function init() {
+    // CONFIG
+    CONFIG.init(50, 50, 4);
+
     // 탭 세팅
     PAGE.TAB.init();
     PAGE.TAB.changeTab("loading");
@@ -563,6 +576,7 @@ async function init() {
     GAME.CONTACT.init();
 
     console.log("home.js 로드 완료");
+
 }
 
 

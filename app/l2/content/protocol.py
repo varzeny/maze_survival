@@ -11,9 +11,10 @@ import json
 
 
 # send
-async def send_0(ws:WebSocket):
+async def send_0(ws:WebSocket, dic:dict):
     try:
-        await ws.send_bytes( struct.pack(">B", 0) )
+        json_data = json.dumps(dic)
+        await ws.send_bytes( struct.pack(">B",0) + json_data.encode("utf-8") )
         return True
     except Exception as e:
         print("ERROR FROM send_0 : ", e)
