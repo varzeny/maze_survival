@@ -566,7 +566,7 @@ async function init() {
     PAGE.MODAL.init();
 
     // SERVER 세팅
-    SERVER.init("wss://test.varzeny.com/ws-game");
+    SERVER.init("wss://maze.varzeny.com/ws-game");
 
     GAME.DRAW.init();
 
