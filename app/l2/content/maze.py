@@ -111,3 +111,8 @@ class Manager:
     #         maze_str += "\n"
 
     #     print(maze_str)
+
+
+if __name__ == "__main__":
+    r = Manager.create_maze_by_DFS(10,10,2)
+    print(r)

@@ -190,6 +190,7 @@ const SERVER = {
             // 화면에 표시
             document.getElementById("port-u").src="static/image/obj/user.png";
             document.getElementById("port-o").src="static/image/obj/enemy.png";
+            console.log(GAME.USER.name, GAME.OPPO.name);
             document.getElementById("name-u").innerHTML = GAME.USER.name;
             document.getElementById("name-o").innerHTML = GAME.OPPO.name;
             GAME.CONTACT.announce.innerHTML = "Ready~";
@@ -480,7 +481,7 @@ const GAME = {
                     switch (ev.key) {
                         case "w":
                             if(this.cooldown()){ break; }
-                            if(GAME.MAZE[GAME.USER.row][GAME.USER.col] & 1){ break; }
+                            // if(GAME.MAZE[GAME.USER.row][GAME.USER.col] & 1){ break; }
                             GAME.DRAW.eraseObj(GAME.USER.row, GAME.USER.col);
                             GAME.USER.row--;
                             GAME.DRAW.drawObjs(GAME.USER.id, GAME.USER.row, GAME.USER.col);
@@ -490,7 +491,7 @@ const GAME = {
                 
                         case "a":
                             if(this.cooldown()){ break; }
-                            if(GAME.MAZE[GAME.USER.row][GAME.USER.col] & 8){ break; }
+                            // if(GAME.MAZE[GAME.USER.row][GAME.USER.col] & 8){ break; }
                             GAME.DRAW.eraseObj(GAME.USER.row, GAME.USER.col);
                             GAME.USER.col--;
                             GAME.DRAW.drawObjs(GAME.USER.id, GAME.USER.row, GAME.USER.col);
@@ -499,7 +500,7 @@ const GAME = {
                 
                         case "s":
                             if(this.cooldown()){ break; }
-                            if(GAME.MAZE[GAME.USER.row][GAME.USER.col] & 4){ break; }
+                            // if(GAME.MAZE[GAME.USER.row][GAME.USER.col] & 4){ break; }
                             GAME.DRAW.eraseObj(GAME.USER.row, GAME.USER.col);
                             GAME.USER.row++;
                             GAME.DRAW.drawObjs(GAME.USER.id, GAME.USER.row, GAME.USER.col);
@@ -508,7 +509,7 @@ const GAME = {
                 
                         case "d":
                             if(this.cooldown()){ break; }
-                            if(GAME.MAZE[GAME.USER.row][GAME.USER.col] & 2){ break; }
+                            // if(GAME.MAZE[GAME.USER.row][GAME.USER.col] & 2){ break; }
                             GAME.DRAW.eraseObj(GAME.USER.row, GAME.USER.col);
                             GAME.USER.col++;
                             GAME.DRAW.drawObjs(GAME.USER.id, GAME.USER.row, GAME.USER.col);
