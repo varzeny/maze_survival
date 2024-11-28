@@ -115,7 +115,7 @@ const SERVER = {
         },
     
         // 20~29 maze //////////////////////////////////////////////////////////
-        20:(respData)=>{ // maze init
+        20:async(respData)=>{ // maze init
             const matrix = new Uint8Array( respData.buffer, 1 );
             const maze = [];
             for (let i = 0; i < CONFIG.rows; i++) {
@@ -124,9 +124,7 @@ const SERVER = {
             GAME.MAZE = maze;
             // console.log(GAME.MAZE);
             console.log("미로 수신함");
-            setTimeout(()=>{
-                console.log("로딩 대기");
-            }, 3000);
+            await new Promise(resolve => setTimeout(resolve, 3000));
     
             // 미로 그리기
             for (let r = 0; r < CONFIG.rows; r++) {
