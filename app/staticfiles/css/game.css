@@ -59,7 +59,7 @@ main {
                         /* image-rendering: pixelated; */
                     }
                         #maze-canvas{
-                            background: url("../image/obj/tile.jpg");
+                            background-image: url("../image/obj/tile.jpg");
                             background-repeat: repeat;
                             /* background-size: cover; */
                             z-index: 1;
