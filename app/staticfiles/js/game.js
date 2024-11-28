@@ -126,7 +126,7 @@ const SERVER = {
             console.log("미로 수신함");
             setTimeout(()=>{
                 console.log("로딩 대기");
-            }, 1000);
+            }, 3000);
     
             // 미로 그리기
             for (let r = 0; r < CONFIG.rows; r++) {
