@@ -137,7 +137,9 @@ const SERVER = {
         21:(respData)=>{ // maze deinit
     
         },
-        22:(respData)=>{ // maze 시작
+        22:async(respData)=>{ // maze 시작
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
             GAME.USER.row = respData.getUint16(1)
             GAME.USER.col = respData.getUint16(3)
             GAME.USER.state = 1;
