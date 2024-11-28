@@ -122,7 +122,7 @@ const SERVER = {
                 maze.push(matrix.slice(i * CONFIG.cols, (i + 1) * CONFIG.cols));
             }
             GAME.MAZE = maze;
-    
+            console.log(GAME.MAZE)
             console.log("미로 수신함");
     
             // 미로 그리기
