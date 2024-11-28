@@ -122,8 +122,11 @@ const SERVER = {
                 maze.push(matrix.slice(i * CONFIG.cols, (i + 1) * CONFIG.cols));
             }
             GAME.MAZE = maze;
-            console.log(GAME.MAZE)
+            // console.log(GAME.MAZE);
             console.log("미로 수신함");
+            setTimeout(()=>{
+                console.log("로딩 대기");
+            }, 1000);
     
             // 미로 그리기
             for (let r = 0; r < CONFIG.rows; r++) {
