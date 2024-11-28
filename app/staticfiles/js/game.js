@@ -124,7 +124,7 @@ const SERVER = {
             GAME.MAZE = maze;
             // console.log(GAME.MAZE);
             console.log("미로 수신함");
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            await new Promise(resolve => setTimeout(resolve, 1000));
     
             // 미로 그리기
             for (let r = 0; r < CONFIG.rows; r++) {
